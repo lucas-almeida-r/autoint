@@ -108,6 +108,7 @@ void Solver::solve ()
       }
       // TALVEZ DIVIDIR em um "forward phase" e em um "update phase" e nao deixar tudo em um "solve"
       // ai o forward calcularia F_h e os gradientes, e depois rodaria o update para atualizar o s
+      // TALVEZ FAZER UM METODO CHAMADO "calculate F_h", nisso ja calcula grad e hess tambem
     }
     E_h = c12 * pow(solution.back(), 2) * radius + 
           pressure * solution.back() * pow(radius, 2) +
@@ -117,13 +118,28 @@ void Solver::solve ()
     if(analytic_diff)
       DE_h = c11/2*DE_h;
 
-    // montagem do gradiente
+    // montagem do gradiente e da hessiana
     for(unsigned int i = 0; i < solution.size(); ++i)
-      grad_F_delta[i] = F_delta.dx(i).val();
+    {
+      grad_F[i] = F_delta.dx(i).val();
+      for(unsigned int j =0; j < solution.size(); ++j)
+        hess_F[i][j] = F_delta.dx(i).dx(j);
+    }
 
     // print do gradiente
+    std::cout << "grad_F:\n";
     for(unsigned int i = 0; i < solution.size(); ++i)
-      std::cout << grad_F_delta[i] << std::endl;
+      std::cout << grad_F[i] << std::endl;
+    
+    // print da hessiana
+    std::cout << "hess_F:\n";
+    for(unsigned int i = 0; i < solution.size(); ++i)
+    {
+      for(unsigned int j = 0; j < solution.size(); ++j)
+        std::cout << hess_F[i][j] << "\t";
+      std::cout << std::endl;
+    }
+      
 
     // alguns prints para conferir valores
     std::cout << "E_h: " << E_h << "\nP_h: " << P_h << "\nF_delta: " << F_delta 
@@ -155,7 +171,8 @@ void Solver::run ()
       dof_handler.distribute_dofs(fe); // garantir numeracao do rho=0 ate o rho=radius
       //solution.resize(dof_handler.n_dofs(), 0.001); // lembrar que primeiro dof é sempre 0
       solution = {0.001,0.003,0.004};
-      grad_F_delta.resize(dof_handler.n_dofs(), 0);
+      grad_F.resize(dof_handler.n_dofs(), 0);
+      hess_F.resize(dof_handler.n_dofs(), grad_F);
       for (unsigned int i = 0; i < solution.size(); ++i) // diz que solution sao variaveis independentes
         {
           solution[i].diff(i, solution.size());

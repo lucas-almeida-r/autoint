@@ -38,5 +38,6 @@ private:
   FE_Q<1> fe;
 
   std::vector<Sacado::Fad::DFad<Sacado::Fad::DFad<double>>> solution;
-  std::vector<double> grad_F_delta;
+  std::vector<double> grad_F;
+  std::vector<std::vector<double>> hess_F;
 };
