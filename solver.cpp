@@ -39,8 +39,7 @@ Solver::Solver(const int poly_degree, const unsigned int refine_global, const un
 Solver::~Solver()
 {}
 
-
-void Solver::solve ()
+void Solver::compute_F_grad_hess()
 {
   const bool analytic_diff = true;
   const QGauss<1>  quadrature_formula(quad_degree);
@@ -96,28 +95,32 @@ void Solver::solve ()
           if(i_aux != 999)
           {
             DE_h += (2*pow(rho,2)*sg_prime*fe_values.shape_grad(i_aux, q)[0] + 
-                  4*gama*sg*fe_values.shape_value(i_aux, q)) * fe_values.JxW(q);
+                     4*gama*sg*fe_values.shape_value(i_aux, q)) * 
+                    fe_values.JxW(q);
             DP_h += -pow(rho,2) * 
                     ( fe_values.shape_grad(i_aux, q)[0] * pow(1+sg/rho, 2) +
                       (1+sg_prime)*2*(1+sg/rho)*fe_values.shape_value(i_aux, q)/rho ) / 
                     pow((1+sg_prime)*pow(1+sg/rho,2) - eps, 2) * 
                     fe_values.JxW(q);
+            DDE_h += (2*pow(rho, 2)*pow(fe_values.shape_grad(i_aux, q)[0], 2) + 
+                      4*gama*pow(fe_values.shape_value(i_aux, q),2)) *
+                     fe_values.JxW(q);
           }
         }
-        
       }
-      // TALVEZ DIVIDIR em um "forward phase" e em um "update phase" e nao deixar tudo em um "solve"
-      // ai o forward calcularia F_h e os gradientes, e depois rodaria o update para atualizar o s
-      // TALVEZ FAZER UM METODO CHAMADO "calculate F_h", nisso ja calcula grad e hess tambem
-    }
+    } // end for cells
+    
     E_h = c12 * pow(solution.back(), 2) * radius + 
           pressure * solution.back() * pow(radius, 2) +
           c11/2 * E_h;
     F_delta = E_h + P_h / delta;
 
     if(analytic_diff)
-      DE_h = c11/2*DE_h;
-
+    {
+      DE_h = c11/2 * DE_h;
+      DDE_h = c11/2 * DDE_h;
+    }
+      
     // montagem do gradiente e da hessiana
     for(unsigned int i = 0; i < solution.size(); ++i)
     {
@@ -125,34 +128,35 @@ void Solver::solve ()
       for(unsigned int j =0; j < solution.size(); ++j)
         hess_F[i][j] = F_delta.dx(i).dx(j);
     }
-
-    // print do gradiente
-    std::cout << "grad_F:\n";
-    for(unsigned int i = 0; i < solution.size(); ++i)
-      std::cout << grad_F[i] << std::endl;
-    
-    // print da hessiana
-    std::cout << "hess_F:\n";
-    for(unsigned int i = 0; i < solution.size(); ++i)
-    {
-      for(unsigned int j = 0; j < solution.size(); ++j)
-        std::cout << hess_F[i][j] << "\t";
-      std::cout << std::endl;
-    }
-      
-
-    // alguns prints para conferir valores
-    std::cout << "E_h: " << E_h << "\nP_h: " << P_h << "\nF_delta: " << F_delta 
-              << "\nDE_h: " << DE_h <<  "\nDP_h: " << DP_h << "\n";
+}
 
 
+void Solver::solve()
+{
+  compute_F_grad_hess();
+
+  // print do gradiente
+  std::cout << "grad_F:\n";
+  for(unsigned int i = 0; i < solution.size(); ++i)
+    std::cout << grad_F[i] << std::endl;
+  
+  // print da hessiana
+  std::cout << "hess_F:\n";
+  for(unsigned int i = 0; i < solution.size(); ++i)
+  {
+    for(unsigned int j = 0; j < solution.size(); ++j)
+      std::cout << hess_F[i][j] << "\t";
+    std::cout << std::endl;
+  }
+
+  // alguns prints para conferir valores
+  std::cout << "E_h: " << E_h << "\nP_h: " << P_h << "\nF_delta: " << F_delta 
+            << "\nDE_h: " << DE_h <<  "\nDP_h: " << DP_h << "\nDDE_h: " << DDE_h << "\n";
 }
 
 
 void Solver::run ()
 {
-  // temos 8 ciclos de refinamento, no primeiro ciclo a gente cria a mesh e refinamos 1 vez
-  // nos outros ciclos, chamamos a funcao refine_grid 
   for (unsigned int cycle=0; cycle<1; ++cycle)
     {
       std::cout << "Cycle " << cycle << ':' << std::endl;
@@ -169,8 +173,8 @@ void Solver::run ()
                 << std::endl;
 
       dof_handler.distribute_dofs(fe); // garantir numeracao do rho=0 ate o rho=radius
-      //solution.resize(dof_handler.n_dofs(), 0.001); // lembrar que primeiro dof é sempre 0
-      solution = {0.001,0.003,0.004};
+      solution.resize(dof_handler.n_dofs(), 0); // lembrar que primeiro dof é sempre 0
+      //solution = {0,0,0};
       grad_F.resize(dof_handler.n_dofs(), 0);
       hess_F.resize(dof_handler.n_dofs(), grad_F);
       for (unsigned int i = 0; i < solution.size(); ++i) // diz que solution sao variaveis independentes

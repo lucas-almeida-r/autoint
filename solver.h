@@ -23,6 +23,7 @@ public:
   
 private:
   void solve();
+  void compute_F_grad_hess();
 
   const unsigned int refine_global, quad_degree;
 
@@ -30,7 +31,7 @@ private:
                eps = 0.1, radius = 1, c12 = 5e+4, gama = (c22 + c23 + c12)/c11;
   double delta = 1;
 
-  Sacado::Fad::DFad<Sacado::Fad::DFad<double>> F_delta, E_h, P_h, DE_h, DP_h;
+  Sacado::Fad::DFad<Sacado::Fad::DFad<double>> F_delta, E_h, P_h, DE_h, DP_h, DDE_h;
 
   Triangulation<1> triangulation;
   DoFHandler<1>    dof_handler;
