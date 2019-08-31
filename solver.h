@@ -30,13 +30,13 @@ private:
                eps = 0.1, radius = 1, c12 = 5e+4, gama = (c22 + c23 + c12)/c11;
   double delta = 1;
 
-  Sacado::Fad::DFad<double> F_delta, E_h, P_h, DE_h, DP_h;
+  Sacado::Fad::DFad<Sacado::Fad::DFad<double>> F_delta, E_h, P_h, DE_h, DP_h;
 
   Triangulation<1> triangulation;
   DoFHandler<1>    dof_handler;
 
   FE_Q<1> fe;
 
-  std::vector<Sacado::Fad::DFad<double>> solution;
+  std::vector<Sacado::Fad::DFad<Sacado::Fad::DFad<double>>> solution;
   std::vector<double> grad_F_delta;
 };

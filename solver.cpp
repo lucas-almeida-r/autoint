@@ -42,7 +42,7 @@ Solver::~Solver()
 
 void Solver::solve ()
 {
-  const bool analytic_diff = false;
+  const bool analytic_diff = true;
   const QGauss<1>  quadrature_formula(quad_degree);
   FEValues<1> fe_values (fe, quadrature_formula,
                            update_values    |  update_gradients |
@@ -52,7 +52,7 @@ void Solver::solve ()
   const unsigned int   n_q_points    = quadrature_formula.size();
   std::vector<types::global_dof_index> local_dof_indices (dofs_per_cell);
 
-  Sacado::Fad::DFad<double> sg, sg_prime; // scalar_product(s,g) e (s,g')
+  Sacado::Fad::DFad<Sacado::Fad::DFad<double>> sg, sg_prime; // scalar_product(s,g) e (s,g')
 
   F_delta = 0;
   E_h = 0;
@@ -92,7 +92,7 @@ void Solver::solve ()
         // Calculo derivadas analiticas de eta_1 (para o eta_n falta adicionar termos ao DE_h)
         if(analytic_diff)
         {
-          int i_aux = (local_dof_indices[0] == 0) ? 0 : (local_dof_indices[1] == 0) ? 1 : 999;
+          int i_aux = (local_dof_indices[0] == 1) ? 0 : (local_dof_indices[1] == 1) ? 1 : 999;
           if(i_aux != 999)
           {
             DE_h += (2*pow(rho,2)*sg_prime*fe_values.shape_grad(i_aux, q)[0] + 
@@ -119,7 +119,7 @@ void Solver::solve ()
 
     // montagem do gradiente
     for(unsigned int i = 0; i < solution.size(); ++i)
-      grad_F_delta[i] = F_delta.dx(i);
+      grad_F_delta[i] = F_delta.dx(i).val();
 
     // print do gradiente
     for(unsigned int i = 0; i < solution.size(); ++i)
@@ -157,8 +157,11 @@ void Solver::run ()
       solution = {0.001,0.003,0.004};
       grad_F_delta.resize(dof_handler.n_dofs(), 0);
       for (unsigned int i = 0; i < solution.size(); ++i) // diz que solution sao variaveis independentes
-        solution[i].diff(i, solution.size());
-
+        {
+          solution[i].diff(i, solution.size());
+          solution[i].val().diff(i, solution.size());
+        }
+        
       std::cout << "   Number of degrees of freedom: "
                 << dof_handler.n_dofs()
                 << std::endl;
