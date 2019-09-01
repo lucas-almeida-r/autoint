@@ -42,6 +42,15 @@ Solver::~Solver()
 void Solver::compute_F_grad_hess()
 {
   const bool analytic_diff = true;
+
+  std::vector<Sacado::Fad::DFad<Sacado::Fad::DFad<double>>> dofs(n_dofs, 0);
+  for (unsigned int i = 0; i < n_dofs; ++i) // diz que solution sao variaveis independentes
+  {
+    dofs[i] = solution[i];
+    dofs[i].diff(i, n_dofs);
+    dofs[i].val().diff(i, n_dofs);
+  }
+
   const QGauss<1>  quadrature_formula(quad_degree);
   FEValues<1> fe_values (fe, quadrature_formula,
                            update_values    |  update_gradients |
@@ -67,7 +76,7 @@ void Solver::compute_F_grad_hess()
       /* std::vector<Sacado::Fad::DFad<double>> local_etas(dofs_per_cell);
       for (unsigned int i = 0; i < dofs_per_cell; ++i)
       {
-        local_etas[i] = solution[local_dof_indices[i]];
+        local_etas[i] = dofs[local_dof_indices[i]];
         local_etas[i].diff(i, dofs_per_cell);
       } */
 
@@ -81,8 +90,8 @@ void Solver::compute_F_grad_hess()
         {
           const double phi_i = fe_values.shape_value(i, q);
           const double phi_i_prime = fe_values.shape_grad(i, q)[0]; // acessa o seu unico elemento
-          sg += solution[local_dof_indices[i]] * phi_i;
-          sg_prime += solution[local_dof_indices[i]] * phi_i_prime;
+          sg += dofs[local_dof_indices[i]] * phi_i;
+          sg_prime += dofs[local_dof_indices[i]] * phi_i_prime;
         }
 
         E_h += (pow(rho*sg_prime, 2) + 2*gama*pow(sg,2)) * fe_values.JxW(q);
@@ -109,9 +118,9 @@ void Solver::compute_F_grad_hess()
         }
       }
     } // end for cells
-    
-    E_h = c12 * pow(solution.back(), 2) * radius + 
-          pressure * solution.back() * pow(radius, 2) +
+
+    E_h = c12 * pow(dofs.back(), 2) * radius + 
+          pressure * dofs.back() * pow(radius, 2) +
           c11/2 * E_h;
     F_delta = E_h + P_h / delta;
 
@@ -122,10 +131,10 @@ void Solver::compute_F_grad_hess()
     }
       
     // montagem do gradiente e da hessiana
-    for(unsigned int i = 0; i < solution.size(); ++i)
+    for(unsigned int i = 0; i < n_dofs; ++i)
     {
       grad_F[i] = F_delta.dx(i).val();
-      for(unsigned int j =0; j < solution.size(); ++j)
+      for(unsigned int j =0; j < n_dofs; ++j)
         hess_F[i][j] = F_delta.dx(i).dx(j);
     }
 }
@@ -137,14 +146,14 @@ void Solver::solve()
 
   // print do gradiente
   std::cout << "grad_F:\n";
-  for(unsigned int i = 0; i < solution.size(); ++i)
+  for(unsigned int i = 0; i < n_dofs; ++i)
     std::cout << grad_F[i] << std::endl;
   
   // print da hessiana
   std::cout << "hess_F:\n";
-  for(unsigned int i = 0; i < solution.size(); ++i)
+  for(unsigned int i = 0; i < n_dofs; ++i)
   {
-    for(unsigned int j = 0; j < solution.size(); ++j)
+    for(unsigned int j = 0; j < n_dofs; ++j)
       std::cout << hess_F[i][j] << "\t";
     std::cout << std::endl;
   }
@@ -158,36 +167,36 @@ void Solver::solve()
 void Solver::run ()
 {
   for (unsigned int cycle=0; cycle<1; ++cycle)
-    {
-      std::cout << "Cycle " << cycle << ':' << std::endl;
-      if (cycle == 0)
-        {
-          GridGenerator::hyper_cube(triangulation, 0, radius, /*colorize*/ true);
-          triangulation.refine_global(refine_global);
-        }
-      else
-        Assert(false, ExcNotImplemented()); //refine_grid ();
+  {
+    std::cout << "Cycle " << cycle << ':' << std::endl;
+    if (cycle == 0)
+      {
+        GridGenerator::hyper_cube(triangulation, 0, radius, /*colorize*/ true);
+        triangulation.refine_global(refine_global);
+      }
+    else
+      Assert(false, ExcNotImplemented()); //refine_grid ();
 
-      std::cout << "   Number of active cells:       "
-                << triangulation.n_active_cells()
-                << std::endl;
+    std::cout << "   Number of active cells:       "
+              << triangulation.n_active_cells()
+              << std::endl;
 
-      dof_handler.distribute_dofs(fe); // garantir numeracao do rho=0 ate o rho=radius
-      solution.resize(dof_handler.n_dofs(), 0); // lembrar que primeiro dof é sempre 0
-      //solution = {0,0,0};
-      grad_F.resize(dof_handler.n_dofs(), 0);
-      hess_F.resize(dof_handler.n_dofs(), grad_F);
-      for (unsigned int i = 0; i < solution.size(); ++i) // diz que solution sao variaveis independentes
-        {
-          solution[i].diff(i, solution.size());
-          solution[i].val().diff(i, solution.size());
-        }
-        
-      std::cout << "   Number of degrees of freedom: "
-                << dof_handler.n_dofs()
-                << std::endl;
-    
-    solve();
-    //std::cout << gama << std::endl;
-    }
+    dof_handler.distribute_dofs(fe); // garantir numeracao do rho=0 ate o rho=radius
+    n_dofs = dof_handler.n_dofs();
+    solution.resize(n_dofs, 0); // lembrar que primeiro dof é sempre 0
+    //solution = {-0.0001,-0.002,-0.005};
+    grad_F.resize(n_dofs, 0);
+    hess_F.resize(n_dofs, grad_F);
+    /* for (unsigned int i = 0; i < n_dofs; ++i) // diz que solution sao variaveis independentes
+      {
+        solution[i].diff(i, n_dofs);
+        solution[i].val().diff(i, n_dofs);
+      } */
+      
+    std::cout << "   Number of degrees of freedom: "
+              << dof_handler.n_dofs()
+              << std::endl;
+  
+  solve();
+  }
 }
