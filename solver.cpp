@@ -89,6 +89,9 @@ void Solver::compute_F_grad_hess()
       sg_prime = 0;
       double rho = fe_values.quadrature_point(q)[0]; // coordenada global
     
+      // na verdade teria que passar por todos dofs, mas como phi é sempre zero fora da celula
+      // so passamos pelos dofs da celula para calcular o produto escalar
+      // lembrar que "g" é uma funcao de rho, entao ela vai fazer aprte da somatoria nos quad normalmente
       for (unsigned int i = 0; i < dofs_per_cell; ++i)
       {
         const double phi_i = fe_values.shape_value(i, q);
@@ -142,8 +145,12 @@ void Solver::compute_F_grad_hess()
   }
 
   // alguns prints para conferir valores
-  std::cout << "\nE_h: " << E_h << "\nP_h: " << P_h << "\nF_delta: " << F_delta 
-            << "\nDE_h: " << DE_h <<  "\nDP_h: " << DP_h << "\nDDE_h: " << DDE_h << "\n";
+  if(verbose)
+  {
+    std::cout << "\nE_h: " << E_h << "\nP_h: " << P_h << "\nF_delta: " << F_delta 
+              << "\nDE_h: " << DE_h <<  "\nDP_h: " << DP_h << "\nDDE_h: " << DDE_h << "\n";
+  }
+    
 }
 
 void Solver::compute_dk()
@@ -163,11 +170,12 @@ void Solver::compute_dk()
   inv_hessT.invert(hessT);
   inv_hessT.vmult(dkT, gradT);
   
-  for (unsigned int i = 0; i < n_dofs; ++i)
+  // dk[0] nunca sera atualizado, entao dk[0] sera sempre zero, entao new_s[0] e solution[0] serao sempre zero
+  for (unsigned int i = 1; i < n_dofs; ++i)
     dk[i] = dkT(i);
 
   // somente alguns prints
-  if(false)
+  if(verbose)
   {
     // print da inversa
   std::cout << "\ninv_hessT:\n";
@@ -190,16 +198,20 @@ void Solver::compute_dk()
   }
 }
 
-/* void Solver::compute_alfa()
+void Solver::compute_alpha_derivs(double alpha, double &dF_dAlpha, double &d2F_dAlpha2)
 {
-  std::vector<Sacado::Fad::DFad<Sacado::Fad::DFad<double>>> new_s(n_dofs, 0); // new_s = s_k + alfa^(i) * d_k
-  Sacado::Fad::DFad<Sacado::Fad::DFad<double>> alfa = 0;
-  alfa.diff(0,1); // so vamos derivar com relacao a alfa
-  alfa.val().diff(0,1); // mas vamos derivar 2 vezes
+  // alphaAD é uma variavel interna de compute_alpha_derivs que recebe o valor do alpha atual
+  // e é usada para fazer as derivadas
+  std::vector<Sacado::Fad::DFad<Sacado::Fad::DFad<double>>> new_s(n_dofs, 0); // new_s = s_k + alpha^(i) * d_k
+  Sacado::Fad::DFad<Sacado::Fad::DFad<double>> alphaAD = alpha;
+  alphaAD.diff(0,1); // so vamos derivar com relacao a alphaAD
+  alphaAD.val().diff(0,1); // mas vamos derivar 2 vezes
 
   // codigo duplicado (mas modificado) de compute_F_grad_hess:
-  for (unsigned int i = 0; i < n_dofs; ++i) // diz que solution sao variaveis independentes
-    new_s[i] = solution[i] + alfa * dk[i];
+  Sacado::Fad::DFad<Sacado::Fad::DFad<double>> F_delta, E_h, P_h;
+  F_delta = 0; E_h = 0; P_h = 0;
+  for (unsigned int i = 0; i < n_dofs; ++i)
+    new_s[i] = solution[i] + alphaAD * dk[i];
 
   const QGauss<1>  quadrature_formula(quad_degree);
   FEValues<1> fe_values (fe, quadrature_formula,
@@ -212,83 +224,170 @@ void Solver::compute_dk()
 
   Sacado::Fad::DFad<Sacado::Fad::DFad<double>> sg, sg_prime; // scalar_product(s,g) e (s,g')
 
-  F_delta = 0;
-  E_h = 0;
-  P_h = 0;
   for (const auto &cell : dof_handler.active_cell_iterators())
-    {
-      fe_values.reinit(cell);
-      cell->get_dof_indices(local_dof_indices);
+  {
+    fe_values.reinit(cell);
+    cell->get_dof_indices(local_dof_indices);
 
-      for (unsigned int q = 0; q < n_q_points; ++q)
+    for (unsigned int q = 0; q < n_q_points; ++q)
+    {
+      sg = 0;
+      sg_prime = 0;
+      double rho = fe_values.quadrature_point(q)[0]; // coordenada global
+    
+      for (unsigned int i = 0; i < dofs_per_cell; ++i)
       {
-        sg = 0;
-        sg_prime = 0;
-        double rho = fe_values.quadrature_point(q)[0]; // coordenada global
-      
-        for (unsigned int i = 0; i < dofs_per_cell; ++i)
-        {
-          const double phi_i = fe_values.shape_value(i, q);
-          const double phi_i_prime = fe_values.shape_grad(i, q)[0]; // acessa o seu unico elemento
-          sg += new_s[local_dof_indices[i]] * phi_i;
-          sg_prime += new_s[local_dof_indices[i]] * phi_i_prime;
-        }
-
-        E_h += (pow(rho*sg_prime, 2) + 2*gama*pow(sg,2)) * fe_values.JxW(q);
-        P_h += pow(rho, 2) / ( (1+sg_prime) * pow(1+sg/rho, 2) - eps ) * fe_values.JxW(q);
+        const double phi_i = fe_values.shape_value(i, q);
+        const double phi_i_prime = fe_values.shape_grad(i, q)[0]; // acessa o seu unico elemento
+        sg += new_s[local_dof_indices[i]] * phi_i;
+        sg_prime += new_s[local_dof_indices[i]] * phi_i_prime;
       }
-    } // end for cells
 
-    E_h = c12 * pow(dofs.back(), 2) * radius + 
-          pressure * dofs.back() * pow(radius, 2) +
-          c11/2 * E_h;
-    F_delta = E_h + P_h / delta;
-      
-    // montagem do gradiente e da hessiana
-    for(unsigned int i = 0; i < n_dofs; ++i)
+      E_h += (pow(rho*sg_prime, 2) + 2*gama*pow(sg,2)) * fe_values.JxW(q);
+      P_h += pow(rho, 2) / ( (1+sg_prime) * pow(1+sg/rho, 2) - eps ) * fe_values.JxW(q);
+    }
+  } // end for cells
+
+  E_h = c12 * pow(new_s.back(), 2) * radius + 
+        pressure * new_s.back() * pow(radius, 2) +
+        c11/2 * E_h;
+  F_delta = E_h + P_h / delta;
+    
+  // derivada de F_delta com relacao a alpha
+  dF_dAlpha = F_delta.dx(0).val();
+  d2F_dAlpha2 = F_delta.dx(0).dx(0);
+}
+
+void Solver::compute_alpha()
+{
+  const unsigned int iter_limit = 1000;
+  const double alpha_tol = 0.001; // criterio de parada da busca pelo alpha
+  double alpha = alpha_k, prev_alpha = alpha_k, 
+         dF_dAlpha, d2F_dAlpha2;
+  std::vector<double> new_s(n_dofs, 0); // new_s = s_k + alpha^(i) * d_k
+
+  for (unsigned int iter = 0; iter < iter_limit; ++iter)
+  {
+    // calcula as derivadas e poe em dF_dAlpha, d2F_dAlpha2
+    compute_alpha_derivs(alpha, dF_dAlpha, d2F_dAlpha2);
+
+    prev_alpha = alpha;
+    alpha = alpha - dF_dAlpha / d2F_dAlpha2;
+
+    if(verbose)
+      std:: cout << "alpha\n" << alpha << "\ndalpha\n" << dF_dAlpha << "\nd2F_dAlpha2:\n" << d2F_dAlpha2 << "\n";
+
+    // atualiza new_s com o novo alpha e o mesmo s_k (solution) e d_k
+    for (unsigned int i = 0; i < n_dofs; ++i)
+      new_s[i] = solution[i] + alpha * dk[i];
+
+    // confere se viola (70) em algum dos nos
+    const unsigned int   dofs_per_cell = fe.dofs_per_cell;
+    std::vector<types::global_dof_index> local_dof_indices (dofs_per_cell);
+    typename DoFHandler<1>::active_cell_iterator
+      cell = dof_handler.begin_active(),  endc = dof_handler.end();
+    for (; cell!=endc; ) // rodo ++cell manualmente
     {
-      grad_F[i] = F_delta.dx(i).val();
-      for(unsigned int j =0; j < n_dofs; ++j)
-        hess_F[i][j] = F_delta.dx(i).dx(j);
+      cell->get_dof_indices(local_dof_indices);
+      double rho = cell->vertex(1)(0); // espero que o segundo vertice seja sempre o do rho maior [CONFERIR]
+      double h = cell->vertex(1)(0) - cell->vertex(0)(0);
+      double phi_i_prime = 1 / h;
+      double det = (1 + new_s[local_dof_indices[1]]*phi_i_prime) *
+                  pow(1 + new_s[local_dof_indices[1]]*1/rho, 2) - eps;
+      std::cout << "rho: " << rho << "\n";
+
+      //std:: cout << "alpha 70:\n" << det << "\n" << rho << "\n" << h << "\n" << phi_i_prime << "\n";
+
+      if(det < 0)
+      {
+        if(verbose)
+          std::cout << "  Aviso: alpha deu um pulo muito grande, reduzindo seu valor e reavaliando (70) nos nós...\n";
+        alpha = alpha / 2;
+        for (unsigned int i = 0; i < n_dofs; ++i)
+          new_s[i] = solution[i] + alpha * dk[i];
+        cell = dof_handler.begin_active();
+      }
+      else
+        ++cell;
+      
     }
 
-  
-  // chama compute_F_hess_grad em uma versao modificada que nao calcula derivadas apenas o F_delta
+    if(std::abs((alpha - prev_alpha)/alpha) < alpha_tol)
+    {
+      if(verbose)
+        std::cout << "\nsaindo...\n" << std::abs((alpha - prev_alpha)/alpha) << "\n";
+      break; // sai do loop do alpha
+    }
+      
 
-
-  std::vector<Sacado::Fad::DFad<Sacado::Fad::DFad<double>>> dofs(n_dofs, 0);
-  for (unsigned int i = 0; i < n_dofs; ++i) // diz que solution sao variaveis independentes
-  {
-    new_s[i] = solution[i];
-    new_s[i].diff(i, n_dofs);
-    new_s[i].val().diff(i, n_dofs);
+    if(iter == iter_limit - 1)
+      std::cout << "\n   Aviso: loop do alpha atingiu o limite de iteracoes e foi aceito como alpha final.\n";
   }
+  alpha_k = alpha;
+  /* // ja tenho que ter declarado fe_values, quadrature_formula,...
+    // usar QMidpoint para calcular sempre no meio da celula
+    // passar esse QMidpoint para o fe_values que calcula phi_linha
+    // e passar QTrapz para o fe_values que calcula phi
+    fe_values_trapez.reinit(cell);
+    fe_values_midpoint.reinit(cell);
+    cell->get_dof_indices(local_dof_indices);
+    sg = 0;
+    sg_prime = 0;
+    double rho = cell->vertex(1)(0); // espero que o segundo vertice seja sempre o do rho maior [CONFERIR]
+    double h = cell->vertex(1)(0) - cell->vertex(0)(0);
+    for (unsigned int i = 0; i < dofs_per_cell; ++i)
+    {
+      // QMidpoint so tem 1 ponto de quadratura e QTrapez so tem 2 (caso dim=1)
+      // talvez calculando com o JxW e sabendo o valor do W, eu consigo fazer a transferencia dos valores
+      // calculados pelos fe_values na celula de referencia e o valor que seria calculado na celula real
+      // outra opcao é usar (dof_2-dof_1)/h para a derivada e 1 ou 0 para o phi, ja que os phis sao lineares
+      //const double phi_i = fe_values_trapez.shape_value(i, 1) * fe_values_trapez.JxW(1) * 2; // W = 0.5
+      //const double phi_i_prime = fe_values_midpoint.shape_grad(i, 0)[0] * fe_values_midpoint.JxW(0); // W = 1 
+      sg += new_s[local_dof_indices[i]] * phi_i;
+      sg_prime += new_s[local_dof_indices[i]] * phi_i_prime;
+    } */
+
+
   
-} */
+}
 
 void Solver::solve()
 {
-  compute_F_grad_hess();
+  compute_F_grad_hess(); // atualiza grad_F, hess_F
 
-  //compute_dk();
+  compute_dk(); // atualiza dk
 
-  //compute_alfa();
+  compute_alpha(); // atualiza alpha_k
 
-  // novo s = s + alfa * dk
+  // atualiza solution
+  for (unsigned int i = 0; i < n_dofs; ++i)
+    solution[i] = solution[i] + alpha_k * dk[i];
 
-  // print do gradiente
-  std::cout << "\ngrad_F:\n";
-  for(unsigned int i = 0; i < n_dofs; ++i)
-    std::cout << grad_F[i] << std::endl;
-  
-  // print da hessiana
-  std::cout << "\nhess_F:\n";
-  for(unsigned int i = 0; i < n_dofs; ++i)
+  // CONTINUAR CALCULEI O s_1, agora falta montar o loop para continaur achando outros s_k
+
+  // so alguns prints
+  if(verbose)
   {
-    for(unsigned int j = 0; j < n_dofs; ++j)
-      std::cout << hess_F[i][j] << "\t";
-    std::cout << std::endl;
+    // print do gradiente
+    std::cout << "\ngrad_F:\n";
+    for(unsigned int i = 0; i < n_dofs; ++i)
+      std::cout << grad_F[i] << std::endl;
+    
+    // print da hessiana
+    std::cout << "\nhess_F:\n";
+    for(unsigned int i = 0; i < n_dofs; ++i)
+    {
+      for(unsigned int j = 0; j < n_dofs; ++j)
+        std::cout << hess_F[i][j] << "\t";
+      std::cout << std::endl;
+    }
+
+    // print da solucao
+    std::cout << "\nsolution:\n";
+    for(unsigned int i = 0; i < n_dofs; ++i)
+      std::cout << solution[i] << std::endl;
   }
+  
 }
 
 
@@ -311,21 +410,17 @@ void Solver::run ()
 
     dof_handler.distribute_dofs(fe); // garantir numeracao do rho=0 ate o rho=radius
     n_dofs = dof_handler.n_dofs();
-    //solution.resize(n_dofs, 0); // lembrar que primeiro dof é sempre 0
-    solution = {-0.0001,-0.002,-0.005};
+    solution.resize(n_dofs, 0); // lembrar que primeiro dof é sempre 0, faço isso deixando sempre dk[0]=0
+    //solution = {-0.0001,-0.002,-0.005};
     grad_F.resize(n_dofs, 0);
     dk.resize(n_dofs, 0);
     hess_F.resize(n_dofs, grad_F);
-    /* for (unsigned int i = 0; i < n_dofs; ++i) // diz que solution sao variaveis independentes
-      {
-        solution[i].diff(i, n_dofs);
-        solution[i].val().diff(i, n_dofs);
-      } */
+    alpha_k = 0;
       
     std::cout << "   Number of degrees of freedom: "
               << dof_handler.n_dofs()
               << std::endl;
   
-  solve();
+    solve();
   }
 }

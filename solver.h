@@ -25,6 +25,8 @@ private:
   void solve();
   void compute_F_grad_hess();
   void compute_dk();
+  void compute_alpha();
+  void compute_alpha_derivs(double alpha, double &dF_dAlpha, double &d2F_dAlpha2);
 
   const unsigned int refine_global, quad_degree;
 
@@ -32,8 +34,8 @@ private:
                eps = 0.1, radius = 1, c12 = 5e+4, gama = (c22 + c23 + c12)/c11;
   double delta = 1;
   unsigned int n_dofs;
-
-  //Sacado::Fad::DFad<Sacado::Fad::DFad<double>> F_delta, E_h, P_h, DE_h, DP_h, DDE_h;
+  double alpha_k;
+  bool verbose = true;
 
   Triangulation<1> triangulation;
   DoFHandler<1>    dof_handler;
