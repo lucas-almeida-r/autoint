@@ -146,8 +146,6 @@ void Solver::compute_dk()
   dkT.reinit(n_dofs);
   FullMatrix<double> hessT(n_dofs, n_dofs), inv_hessT(n_dofs, n_dofs);
 
-  //Tensor<1, n_dofs, double> gradT, dkT;
-  //Tensor<2, n_dofs, double> hessT;
   for (unsigned int i = 0; i < n_dofs; ++i)
   {
     gradT(i) = grad_F[i];
@@ -157,7 +155,6 @@ void Solver::compute_dk()
 
   inv_hessT.invert(hessT);
   inv_hessT.vmult(dkT, gradT);
-  //dkT = invert(hessT) * gradT; // produto matricial
   
   for (unsigned int i = 0; i < n_dofs; ++i)
     dk[i] = dkT(i);
