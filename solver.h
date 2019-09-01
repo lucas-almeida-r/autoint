@@ -24,6 +24,7 @@ public:
 private:
   void solve();
   void compute_F_grad_hess();
+  void compute_dk();
 
   const unsigned int refine_global, quad_degree;
 
@@ -41,6 +42,6 @@ private:
 
   //std::vector<Sacado::Fad::DFad<Sacado::Fad::DFad<double>>> solution;
   std::vector<double> solution;
-  std::vector<double> grad_F;
+  std::vector<double> grad_F, dk;
   std::vector<std::vector<double>> hess_F;
 };

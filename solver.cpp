@@ -139,18 +139,66 @@ void Solver::compute_F_grad_hess()
     }
 }
 
+void Solver::compute_dk()
+{
+  // cria o Tensor que vai conter o gradiente e a hessiana
+  Vector<double> gradT(grad_F.begin(), grad_F.end()), dkT;
+  dkT.reinit(n_dofs);
+  FullMatrix<double> hessT(n_dofs, n_dofs), inv_hessT(n_dofs, n_dofs);
+
+  //Tensor<1, n_dofs, double> gradT, dkT;
+  //Tensor<2, n_dofs, double> hessT;
+  for (unsigned int i = 0; i < n_dofs; ++i)
+  {
+    gradT(i) = grad_F[i];
+    for (unsigned int j = 0; j < n_dofs; ++j)
+      hessT[i][j] = hess_F[i][j];
+  }
+
+  inv_hessT.invert(hessT);
+  inv_hessT.vmult(dkT, gradT);
+  //dkT = invert(hessT) * gradT; // produto matricial
+  
+  for (unsigned int i = 0; i < n_dofs; ++i)
+    dk[i] = dkT(i);
+
+  // somente alguns prints
+  if(false)
+  {
+    // print da inversa
+  std::cout << "\ninv_hessT:\n";
+  for(unsigned int i = 0; i < n_dofs; ++i)
+  {
+    for(unsigned int j = 0; j < n_dofs; ++j)
+      std::cout << inv_hessT[i][j] << "\t";
+    std::cout << std::endl;
+  }
+
+  // print do gradiente
+  std::cout << "\ngradT:\n";
+  for(unsigned int i = 0; i < n_dofs; ++i)
+    std::cout << gradT[i] << std::endl;
+
+  // print do dk
+  std::cout << "\ndk:\n";
+  for(unsigned int i = 0; i < n_dofs; ++i)
+    std::cout << dk[i] << std::endl;
+  }
+}
 
 void Solver::solve()
 {
   compute_F_grad_hess();
 
+  compute_dk();
+
   // print do gradiente
-  std::cout << "grad_F:\n";
+  std::cout << "\ngrad_F:\n";
   for(unsigned int i = 0; i < n_dofs; ++i)
     std::cout << grad_F[i] << std::endl;
   
   // print da hessiana
-  std::cout << "hess_F:\n";
+  std::cout << "\nhess_F:\n";
   for(unsigned int i = 0; i < n_dofs; ++i)
   {
     for(unsigned int j = 0; j < n_dofs; ++j)
@@ -159,7 +207,7 @@ void Solver::solve()
   }
 
   // alguns prints para conferir valores
-  std::cout << "E_h: " << E_h << "\nP_h: " << P_h << "\nF_delta: " << F_delta 
+  std::cout << "\nE_h: " << E_h << "\nP_h: " << P_h << "\nF_delta: " << F_delta 
             << "\nDE_h: " << DE_h <<  "\nDP_h: " << DP_h << "\nDDE_h: " << DDE_h << "\n";
 }
 
@@ -183,9 +231,10 @@ void Solver::run ()
 
     dof_handler.distribute_dofs(fe); // garantir numeracao do rho=0 ate o rho=radius
     n_dofs = dof_handler.n_dofs();
-    solution.resize(n_dofs, 0); // lembrar que primeiro dof é sempre 0
-    //solution = {-0.0001,-0.002,-0.005};
+    //solution.resize(n_dofs, 0); // lembrar que primeiro dof é sempre 0
+    solution = {-0.0001,-0.002,-0.005};
     grad_F.resize(n_dofs, 0);
+    dk.resize(n_dofs, 0);
     hess_F.resize(n_dofs, grad_F);
     /* for (unsigned int i = 0; i < n_dofs; ++i) // diz que solution sao variaveis independentes
       {
