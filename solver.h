@@ -33,7 +33,7 @@ private:
   double delta = 1;
   unsigned int n_dofs;
 
-  Sacado::Fad::DFad<Sacado::Fad::DFad<double>> F_delta, E_h, P_h, DE_h, DP_h, DDE_h;
+  //Sacado::Fad::DFad<Sacado::Fad::DFad<double>> F_delta, E_h, P_h, DE_h, DP_h, DDE_h;
 
   Triangulation<1> triangulation;
   DoFHandler<1>    dof_handler;
