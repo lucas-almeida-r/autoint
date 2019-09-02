@@ -29,7 +29,7 @@ int main()
 {
   try
     {
-      if(1)
+      if(0)
       {
         Sacado::Fad::DFad<double> a,b,c,d,e,f;
       //double d;
@@ -57,7 +57,7 @@ int main()
       }
       
 
-      Solver solver(1,1,3);
+      Solver solver(1,5,3);
       solver.run();
 
 

@@ -178,23 +178,23 @@ void Solver::compute_dk()
   if(verbose)
   {
     // print da inversa
-  std::cout << "\ninv_hessT:\n";
-  for(unsigned int i = 0; i < n_dofs; ++i)
-  {
-    for(unsigned int j = 0; j < n_dofs; ++j)
-      std::cout << inv_hessT[i][j] << "\t";
-    std::cout << std::endl;
-  }
+    std::cout << "\ninv_hessT:\n";
+    for(unsigned int i = 0; i < n_dofs; ++i)
+    {
+      for(unsigned int j = 0; j < n_dofs; ++j)
+        std::cout << inv_hessT[i][j] << "\t";
+      std::cout << std::endl;
+    }
 
-  // print do gradiente
-  std::cout << "\ngradT:\n";
-  for(unsigned int i = 0; i < n_dofs; ++i)
-    std::cout << gradT[i] << std::endl;
+    // print do gradiente
+    std::cout << "\ngradT:\n";
+    for(unsigned int i = 0; i < n_dofs; ++i)
+      std::cout << gradT[i] << std::endl;
 
-  // print do dk
-  std::cout << "\ndk:\n";
-  for(unsigned int i = 0; i < n_dofs; ++i)
-    std::cout << dk[i] << std::endl;
+    // print do dk
+    std::cout << "\ndk:\n";
+    for(unsigned int i = 0; i < n_dofs; ++i)
+      std::cout << dk[i] << std::endl;
   }
 }
 
@@ -260,13 +260,11 @@ void Solver::compute_alpha_derivs(double alpha, double &dF_dAlpha, double &d2F_d
 
 void Solver::compute_alpha()
 {
-  const unsigned int iter_limit = 1000;
-  const double alpha_tol = 0.001; // criterio de parada da busca pelo alpha
   double alpha = alpha_k, prev_alpha = alpha_k, 
          dF_dAlpha, d2F_dAlpha2;
   std::vector<double> new_s(n_dofs, 0); // new_s = s_k + alpha^(i) * d_k
 
-  for (unsigned int iter = 0; iter < iter_limit; ++iter)
+  for (unsigned int iter = 0; iter < iter_limit_alpha; ++iter)
   {
     // calcula as derivadas e poe em dF_dAlpha, d2F_dAlpha2
     compute_alpha_derivs(alpha, dF_dAlpha, d2F_dAlpha2);
@@ -275,7 +273,7 @@ void Solver::compute_alpha()
     alpha = alpha - dF_dAlpha / d2F_dAlpha2;
 
     if(verbose)
-      std:: cout << "alpha\n" << alpha << "\ndalpha\n" << dF_dAlpha << "\nd2F_dAlpha2:\n" << d2F_dAlpha2 << "\n";
+      std:: cout << "alpha: " << alpha << "\ndalpha: " << dF_dAlpha << "\nd2F_dAlpha2: " << d2F_dAlpha2 << "\n";
 
     // atualiza new_s com o novo alpha e o mesmo s_k (solution) e d_k
     for (unsigned int i = 0; i < n_dofs; ++i)
@@ -294,7 +292,7 @@ void Solver::compute_alpha()
       double phi_i_prime = 1 / h;
       double det = (1 + new_s[local_dof_indices[1]]*phi_i_prime) *
                   pow(1 + new_s[local_dof_indices[1]]*1/rho, 2) - eps;
-      std::cout << "rho: " << rho << "\n";
+      //std::cout << "rho: " << rho << "\n";
 
       //std:: cout << "alpha 70:\n" << det << "\n" << rho << "\n" << h << "\n" << phi_i_prime << "\n";
 
@@ -315,12 +313,11 @@ void Solver::compute_alpha()
     if(std::abs((alpha - prev_alpha)/alpha) < alpha_tol)
     {
       if(verbose)
-        std::cout << "\nsaindo...\n" << std::abs((alpha - prev_alpha)/alpha) << "\n";
+        std::cout << "\nsaindo...  alpha " << std::abs((alpha - prev_alpha)/alpha) << "\n";
       break; // sai do loop do alpha
     }
       
-
-    if(iter == iter_limit - 1)
+    if(iter == iter_limit_alpha - 1)
       std::cout << "\n   Aviso: loop do alpha atingiu o limite de iteracoes e foi aceito como alpha final.\n";
   }
   alpha_k = alpha;
@@ -353,20 +350,51 @@ void Solver::compute_alpha()
 
 void Solver::solve()
 {
-  compute_F_grad_hess(); // atualiza grad_F, hess_F
+  for (unsigned int iter_delta = 0; iter_delta < 10; ++iter_delta)
+  {
+    for (unsigned int iter_sk = 0; iter_sk < iter_limit_sk; ++iter_sk)
+    {
+      compute_F_grad_hess(); // usa solution e atualiza grad_F, hess_F
 
-  compute_dk(); // atualiza dk
+      compute_dk(); // usa grad_F e hess_F e atualiza dk
 
-  compute_alpha(); // atualiza alpha_k
+      compute_alpha(); // usa solution e dk e atualiza alpha_k
 
-  // atualiza solution
-  for (unsigned int i = 0; i < n_dofs; ++i)
-    solution[i] = solution[i] + alpha_k * dk[i];
+      // atualiza solution
+      prev_solution = solution;
+      for (unsigned int i = 0; i < n_dofs; ++i)
+        solution[i] = solution[i] + alpha_k * dk[i];
 
-  // CONTINUAR CALCULEI O s_1, agora falta montar o loop para continaur achando outros s_k
+      // criterio de parada para a serie de s_k
+      double solution_crit, solution_sum = 0, prev_solution_sum = 0;
+      for (unsigned int i = 0; i < n_dofs; ++i)
+      {
+        solution_sum += std::abs(solution[i]);
+        prev_solution_sum += std::abs(prev_solution[i]);
+      }
+      solution_crit = (solution_sum - prev_solution_sum) / (solution_sum + 1e-10);
+      if (solution_crit < solution_tol)
+      {
+        if(verbose)
+          std::cout << "\nsaindo...  solution_crit = " << solution_crit << "\n";
+        break; // sai do loop do s_k
+      }
+
+      if(iter_sk == iter_limit_sk - 1)
+        std::cout << "\n   Aviso: loop do s_k atingiu o limite de iteracoes e foi aceito como s_k final.\n";
+    }
+    std::cout << "\nSolution para delta = " << delta << "\n";
+    for(unsigned int i = 0; i < n_dofs; ++i)
+        std::cout << solution[i] << std::endl;
+    
+    delta = delta * 10;
+    if (delta > delta_max)
+      break;
+  }
+  
 
   // so alguns prints
-  if(verbose)
+  if(false)
   {
     // print do gradiente
     std::cout << "\ngrad_F:\n";
@@ -412,6 +440,7 @@ void Solver::run ()
     n_dofs = dof_handler.n_dofs();
     solution.resize(n_dofs, 0); // lembrar que primeiro dof é sempre 0, faço isso deixando sempre dk[0]=0
     //solution = {-0.0001,-0.002,-0.005};
+    prev_solution.resize(n_dofs, 0);
     grad_F.resize(n_dofs, 0);
     dk.resize(n_dofs, 0);
     hess_F.resize(n_dofs, grad_F);
