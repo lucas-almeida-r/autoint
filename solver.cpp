@@ -317,7 +317,7 @@ void Solver::compute_alpha()
       break; // sai do loop do alpha
     }
       
-    if(iter == iter_limit_alpha - 1)
+    if(iter == iter_limit_alpha - 1 && verbose)
       std::cout << "\n   Aviso: loop do alpha atingiu o limite de iteracoes e foi aceito como alpha final.\n";
   }
   alpha_k = alpha;
@@ -350,7 +350,7 @@ void Solver::compute_alpha()
 
 void Solver::solve()
 {
-  for (unsigned int iter_delta = 0; iter_delta < 10; ++iter_delta)
+  for (unsigned int iter_delta = 0; iter_delta < 20; ++iter_delta)
   {
     for (unsigned int iter_sk = 0; iter_sk < iter_limit_sk; ++iter_sk)
     {

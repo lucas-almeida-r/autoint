@@ -57,7 +57,7 @@ int main()
       }
       
 
-      Solver solver(1,5,3);
+      Solver solver(1,5,5);
       solver.run();
 
 
