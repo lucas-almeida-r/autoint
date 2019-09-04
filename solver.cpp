@@ -41,7 +41,7 @@ Solver::~Solver()
 
 void Solver::compute_F_grad_hess()
 {
-  const bool analytic_diff = true;
+  const bool analytic_diff = false;
 
   Sacado::Fad::DFad<Sacado::Fad::DFad<double>> F_delta, E_h, P_h, DE_h, DP_h, DDE_h;
   std::vector<Sacado::Fad::DFad<Sacado::Fad::DFad<double>>> dofs(n_dofs, 0);
@@ -145,7 +145,7 @@ void Solver::compute_F_grad_hess()
   }
 
   // alguns prints para conferir valores
-  if(verbose)
+  if(false)
   {
     std::cout << "\nE_h: " << E_h << "\nP_h: " << P_h << "\nF_delta: " << F_delta 
               << "\nDE_h: " << DE_h <<  "\nDP_h: " << DP_h << "\nDDE_h: " << DDE_h << "\n";
@@ -172,7 +172,7 @@ void Solver::compute_dk()
   
   // dk[0] nunca sera atualizado, entao dk[0] sera sempre zero, entao new_s[0] e solution[0] serao sempre zero
   for (unsigned int i = 1; i < n_dofs; ++i)
-    dk[i] = dkT(i);
+    dk[i] = -dkT(i); // d_k = - inv(hess)*grad
 
   // somente alguns prints
   if(verbose)
@@ -260,7 +260,7 @@ void Solver::compute_alpha_derivs(double alpha, double &dF_dAlpha, double &d2F_d
 
 void Solver::compute_alpha()
 {
-  double alpha = alpha_k, prev_alpha = alpha_k, 
+  double alpha = 0, prev_alpha = 0, // alpha(0) = 0
          dF_dAlpha, d2F_dAlpha2;
   std::vector<double> new_s(n_dofs, 0); // new_s = s_k + alpha^(i) * d_k
 
@@ -273,7 +273,8 @@ void Solver::compute_alpha()
     alpha = alpha - dF_dAlpha / d2F_dAlpha2;
 
     if(verbose)
-      std:: cout << "alpha: " << alpha << "\ndalpha: " << dF_dAlpha << "\nd2F_dAlpha2: " << d2F_dAlpha2 << "\n";
+      std:: cout << "prev_alpha: " << prev_alpha << "   alpha: " << alpha << "\ndalpha: " << dF_dAlpha 
+                 << "\nd2F_dAlpha2: " << d2F_dAlpha2 << "\n";
 
     // atualiza new_s com o novo alpha e o mesmo s_k (solution) e d_k
     for (unsigned int i = 0; i < n_dofs; ++i)
@@ -290,11 +291,8 @@ void Solver::compute_alpha()
       double rho = cell->vertex(1)(0); // espero que o segundo vertice seja sempre o do rho maior [CONFERIR]
       double h = cell->vertex(1)(0) - cell->vertex(0)(0);
       double phi_i_prime = 1 / h;
-      double det = (1 + new_s[local_dof_indices[1]]*phi_i_prime) *
-                  pow(1 + new_s[local_dof_indices[1]]*1/rho, 2) - eps;
-      //std::cout << "rho: " << rho << "\n";
-
-      //std:: cout << "alpha 70:\n" << det << "\n" << rho << "\n" << h << "\n" << phi_i_prime << "\n";
+      double sg_prime = new_s[local_dof_indices[0]]*(-phi_i_prime) + new_s[local_dof_indices[1]]*phi_i_prime;
+      double det = (1 + sg_prime) * pow(1 + new_s[local_dof_indices[1]]*1/rho, 2) - eps;
 
       if(det < 0)
       {
@@ -313,7 +311,7 @@ void Solver::compute_alpha()
     if(std::abs((alpha - prev_alpha)/alpha) < alpha_tol)
     {
       if(verbose)
-        std::cout << "\nsaindo...  alpha " << std::abs((alpha - prev_alpha)/alpha) << "\n";
+        std::cout << "\nsaindo...  alpha update: " << std::abs((alpha - prev_alpha)/alpha) << "\n";
       break; // sai do loop do alpha
     }
       
@@ -350,14 +348,14 @@ void Solver::compute_alpha()
 
 void Solver::solve()
 {
-  for (unsigned int iter_delta = 0; iter_delta < 20; ++iter_delta)
+  for (unsigned int iter_delta = 0; iter_delta < 4 /* 20 */; ++iter_delta)
   {
     for (unsigned int iter_sk = 0; iter_sk < iter_limit_sk; ++iter_sk)
     {
       compute_F_grad_hess(); // usa solution e atualiza grad_F, hess_F
 
       compute_dk(); // usa grad_F e hess_F e atualiza dk
-
+      
       compute_alpha(); // usa solution e dk e atualiza alpha_k
 
       // atualiza solution
@@ -375,8 +373,8 @@ void Solver::solve()
       solution_crit = (solution_sum - prev_solution_sum) / (solution_sum + 1e-10);
       if (solution_crit < solution_tol)
       {
-        if(verbose)
-          std::cout << "\nsaindo...  solution_crit = " << solution_crit << "\n";
+        if(true)
+          std::cout << "\nsaindo...  solution update: " << solution_crit << "\n";
         break; // sai do loop do s_k
       }
 

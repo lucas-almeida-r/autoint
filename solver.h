@@ -32,14 +32,14 @@ private:
 
   const double pressure = 1000, c11 = 1e+5, c22 = 5e+4, c23 = 5.5e+3,
                eps = 0.1, radius = 1, c12 = 5e+4, gama = (c22 + c23 - c12)/c11;
-  double delta = 0.001, delta_max = 1e+8;
+  double delta = 0.01, delta_max = 1e+8;
   unsigned int n_dofs;
   double alpha_k;
   bool verbose = false;
-  const unsigned int iter_limit_alpha = 10; // numero maximo de iteracoes para alpha
-  const unsigned int iter_limit_sk = 10; // numero maximo de iteracoes para alpha
-  const double alpha_tol = 0.01; // criterio de parada da busca pelo alpha
-  const double solution_tol = 0.01; // criterio de parada da busca pelo s_k
+  const unsigned int iter_limit_alpha = 100; // numero maximo de iteracoes para alpha
+  const unsigned int iter_limit_sk = 100; // numero maximo de iteracoes para alpha
+  const double alpha_tol = 0.0001; // criterio de parada da busca pelo alpha
+  const double solution_tol = 0.0001; // criterio de parada da busca pelo s_k
 
   Triangulation<1> triangulation;
   DoFHandler<1>    dof_handler;
