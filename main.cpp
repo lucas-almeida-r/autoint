@@ -57,28 +57,8 @@ int main()
       }
       
 
-      Solver solver(1,8,3);
-      solver.run();
-
-      // CONTINUAR, CRIAR UM LOG em um arquivo e nao como print no terminal, organizar os verbose
-      // INVESTIGAR como pode acoontecer isso:
-      /*
-      Aviso: alpha deu um pulo muito grande, reduzindo seu valor e reavaliando (70) nos nós...
-      Aviso: alpha deu um pulo muito grande, reduzindo seu valor e reavaliando (70) nos nós...
-
-      saindo...  alpha 1.57294e-13
-      */
-     // nao deveria ter uma sequencia de alpha:... dalpha: ... d2F_dAlpha2: ...  ???
-
-     //INVESTIGAR o alpha nao ficava pulando entre dois valores proximos e ai batia no limite de iteracoes?
-
-
-
-
-
-
-
-      
+      Solver solver(1,4,3);
+      solver.run();      
 
     } //end try
   catch (std::exception &exc)

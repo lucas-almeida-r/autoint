@@ -348,14 +348,14 @@ void Solver::compute_alpha()
 
 void Solver::solve()
 {
-  for (unsigned int iter_delta = 0; iter_delta < 4 /* 20 */; ++iter_delta)
+  for (unsigned int iter_delta = 0; iter_delta < 20; ++iter_delta)
   {
     for (unsigned int iter_sk = 0; iter_sk < iter_limit_sk; ++iter_sk)
     {
       compute_F_grad_hess(); // usa solution e atualiza grad_F, hess_F
 
       compute_dk(); // usa grad_F e hess_F e atualiza dk
-      
+
       compute_alpha(); // usa solution e dk e atualiza alpha_k
 
       // atualiza solution
@@ -373,7 +373,7 @@ void Solver::solve()
       solution_crit = (solution_sum - prev_solution_sum) / (solution_sum + 1e-10);
       if (solution_crit < solution_tol)
       {
-        if(true)
+        if(verbose)
           std::cout << "\nsaindo...  solution update: " << solution_crit << "\n";
         break; // sai do loop do s_k
       }
@@ -381,9 +381,9 @@ void Solver::solve()
       if(iter_sk == iter_limit_sk - 1)
         std::cout << "\n   Aviso: loop do s_k atingiu o limite de iteracoes e foi aceito como s_k final.\n";
     }
-    std::cout << "\nSolution para delta = " << delta << "\n";
+    output_file << "\nSolution para delta = " << delta << "\n";
     for(unsigned int i = 0; i < n_dofs; ++i)
-        std::cout << solution[i] << std::endl;
+        output_file << solution[i] << std::endl;
     
     delta = delta * 10;
     if (delta > delta_max)
@@ -447,7 +447,11 @@ void Solver::run ()
     std::cout << "   Number of degrees of freedom: "
               << dof_handler.n_dofs()
               << std::endl;
-  
+
+    output_file.open("out/sol ref" + std::to_string(refine_global) + ".txt");
     solve();
+    output_file.close();
+    
+    std::cout << "Arquivo " + "out/sol ref" + std::to_string(refine_global) + ".txt gerado!";
   }
 }

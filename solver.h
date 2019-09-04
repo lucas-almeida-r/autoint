@@ -40,6 +40,7 @@ private:
   const unsigned int iter_limit_sk = 100; // numero maximo de iteracoes para alpha
   const double alpha_tol = 0.0001; // criterio de parada da busca pelo alpha
   const double solution_tol = 0.0001; // criterio de parada da busca pelo s_k
+  std::ofstream output_file;
 
   Triangulation<1> triangulation;
   DoFHandler<1>    dof_handler;
