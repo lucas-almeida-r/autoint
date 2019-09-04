@@ -315,7 +315,7 @@ void Solver::compute_alpha()
       break; // sai do loop do alpha
     }
       
-    if(iter == iter_limit_alpha - 1 && verbose)
+    if(iter == iter_limit_alpha - 1)
       std::cout << "\n   Aviso: loop do alpha atingiu o limite de iteracoes e foi aceito como alpha final.\n";
   }
   alpha_k = alpha;
@@ -451,7 +451,7 @@ void Solver::run ()
     output_file.open("out/sol ref" + std::to_string(refine_global) + ".txt");
     solve();
     output_file.close();
-    
-    std::cout << "Arquivo " + "out/sol ref" + std::to_string(refine_global) + ".txt gerado!";
+
+    std::cout << "Arquivo " << "'out/sol ref" << refine_global << ".txt' gerado!" << std::endl;
   }
 }
