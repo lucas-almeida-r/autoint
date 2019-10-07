@@ -38,7 +38,7 @@ int main()
       }
       
 
-      Solver solver(1,4,3);
+      Solver solver(1,8,3);
       solver.run();      
 
     } //end try

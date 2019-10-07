@@ -40,8 +40,13 @@ void Solver::compute_F_grad_hess()
 {
   const bool analytic_diff = false;
 
+  // reset gradiente e hessiana para zero
+  grad_F.assign(grad_F.size(), 0);
+  hess_F.assign(grad_F.size(), grad_F);
+  
+
   Sacado::Fad::DFad<Sacado::Fad::DFad<double>> F_delta, E_h, P_h, DE_h, DP_h, DDE_h;
-  std::vector<Sacado::Fad::DFad<Sacado::Fad::DFad<double>>> dofs(n_dofs, 0);
+  //std::vector<Sacado::Fad::DFad<Sacado::Fad::DFad<double>>> dofs(n_dofs, 0);
 
   // inicializacao de F_delta, E_h, ... , dofs
   F_delta = 0;
@@ -49,12 +54,12 @@ void Solver::compute_F_grad_hess()
   P_h = 0;
   DE_h = 0;
   DP_h = 0;
-  for (unsigned int i = 0; i < n_dofs; ++i) // diz que solution sao variaveis independentes
+  /* for (unsigned int i = 0; i < n_dofs; ++i) // diz que dofs sao variaveis independentes
   {
     dofs[i] = solution[i];
     dofs[i].diff(i, n_dofs);
     dofs[i].val().diff(i, n_dofs);
-  }
+  } */
 
   const QGauss<1>  quadrature_formula(quad_degree);
   FEValues<1> fe_values (fe, quadrature_formula,
@@ -73,12 +78,13 @@ void Solver::compute_F_grad_hess()
     cell->get_dof_indices(local_dof_indices);
 
     // se tiver que achar derivadas ja usando os dofs locais precisa desse codigo comentado
-    /* std::vector<Sacado::Fad::DFad<double>> local_etas(dofs_per_cell);
+    std::vector<Sacado::Fad::DFad<Sacado::Fad::DFad<double>>> dofs(dofs_per_cell);
     for (unsigned int i = 0; i < dofs_per_cell; ++i)
     {
-      local_etas[i] = dofs[local_dof_indices[i]];
-      local_etas[i].diff(i, dofs_per_cell);
-    } */
+      dofs[i] = solution[local_dof_indices[i]];
+      dofs[i].diff(i, dofs_per_cell);
+      dofs[i].val().diff(i, n_dofs);
+    }
 
     for (unsigned int q = 0; q < n_q_points; ++q)
     {
@@ -93,14 +99,25 @@ void Solver::compute_F_grad_hess()
       {
         const double phi_i = fe_values.shape_value(i, q);
         const double phi_i_prime = fe_values.shape_grad(i, q)[0]; // acessa o seu unico elemento
-        sg += dofs[local_dof_indices[i]] * phi_i;
-        sg_prime += dofs[local_dof_indices[i]] * phi_i_prime;
+        sg += dofs[i] * phi_i;
+        sg_prime += dofs[i] * phi_i_prime;
       }
 
-      E_h += (pow(rho*sg_prime, 2) + 2*gama*pow(sg,2)) * fe_values.JxW(q);
-      P_h += pow(rho, 2) / ( (1+sg_prime) * pow(1+sg/rho, 2) - eps ) * fe_values.JxW(q);
+      E_h = 0; P_h = 0; F_delta = 0; // zera qualquer historico de contas
+      E_h = (pow(rho*sg_prime, 2) + 2*gama*pow(sg,2)) * fe_values.JxW(q); //+=
+      P_h = pow(rho, 2) / ( (1+sg_prime) * pow(1+sg/rho, 2) - eps ) * fe_values.JxW(q); //+=
+      F_delta = c11/2 * E_h + P_h / delta;
 
-      // Calculo derivadas analiticas de eta_1 (para o eta_n falta adicionar termos ao DE_h)
+      // adiciona contribuicao de uma das parcelas da somatoria
+      for(unsigned int i = 0; i < dofs_per_cell; ++i)
+      {
+        grad_F[local_dof_indices[i]] += F_delta.dx(i).val();
+        for(unsigned int j = 0; j < dofs_per_cell; ++j)
+          hess_F[local_dof_indices[i]][local_dof_indices[j]] += F_delta.dx(i).dx(j);
+      }
+        
+
+      // Calculo derivadas analiticas só de eta_1 (para o eta_n falta adicionar termos ao DE_h)
       if(analytic_diff)
       {
         int i_aux = (local_dof_indices[0] == 1) ? 0 : (local_dof_indices[1] == 1) ? 1 : 999;
@@ -122,10 +139,14 @@ void Solver::compute_F_grad_hess()
     }
   } // end for cells
 
-  E_h = c12 * pow(dofs.back(), 2) * radius + 
+  // adiciona a parcela da derivada que nao esta no somatorio de pontos de quadratura (só do eta_n)
+  grad_F[n_dofs-1] += 2*c12*solution[n_dofs-1]*radius + pressure*pow(radius,2);
+  hess_F[n_dofs-1][n_dofs-1] += 2 * c12 * radius;
+
+  /* E_h = c12 * pow(dofs.back(), 2) * radius + 
         pressure * dofs.back() * pow(radius, 2) +
         c11/2 * E_h;
-  F_delta = E_h + P_h / delta;
+  F_delta = E_h + P_h / delta; */
 
   if(analytic_diff)
   {
@@ -134,12 +155,12 @@ void Solver::compute_F_grad_hess()
   }
     
   // montagem do gradiente e da hessiana
-  for(unsigned int i = 0; i < n_dofs; ++i)
+  /* for(unsigned int i = 0; i < n_dofs; ++i)
   {
     grad_F[i] = F_delta.dx(i).val();
     for(unsigned int j =0; j < n_dofs; ++j)
       hess_F[i][j] = F_delta.dx(i).dx(j);
-  }
+  } */
 
   // alguns prints para conferir valores
   if(false)

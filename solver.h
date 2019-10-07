@@ -33,7 +33,7 @@ private:
   double alpha_k;
   bool verbose = false;
   const unsigned int iter_limit_alpha = 100; // numero maximo de iteracoes para alpha
-  const unsigned int iter_limit_sk = 100; // numero maximo de iteracoes para alpha
+  const unsigned int iter_limit_sk = 100; // numero maximo de iteracoes para s_k
   const double alpha_tol = 0.0001; // criterio de parada da busca pelo alpha
   const double solution_tol = 0.0001; // criterio de parada da busca pelo s_k
   std::ofstream output_file;
