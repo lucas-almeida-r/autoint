@@ -47,4 +47,7 @@ private:
   std::vector<double> solution, prev_solution;
   std::vector<double> grad_F, dk;
   std::vector<std::vector<double>> hess_F;
+
+  // comp_grad, comp_dk, comp_alpha, update+parada
+  std::vector<double> timing{0.,0.,0.,0.};
 };

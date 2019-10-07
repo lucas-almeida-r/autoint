@@ -17,12 +17,13 @@
 #include <deal.II/numerics/matrix_tools.h>
 #include <deal.II/fe/fe_q.h>
 
-#include <deal.II/lac/solver_cg.h>
-#include <deal.II/lac/precondition.h>
+//#include <deal.II/lac/solver_cg.h>
+//#include <deal.II/lac/precondition.h>
 
 #include <fstream>
 #include <iostream>
 #include <cmath>
+#include <chrono>
 
 #include <Sacado.hpp>
 
@@ -376,16 +377,30 @@ void MySolver::compute_alpha()
 
 void MySolver::solve()
 {
+  // so para "declarar" t1 e t2
+  auto t1 = std::chrono::high_resolution_clock::now();
+  auto t2 = std::chrono::high_resolution_clock::now();
+
   for (unsigned int iter_delta = 0; iter_delta < 20; ++iter_delta)
   {
     for (unsigned int iter_sk = 0; iter_sk < iter_limit_sk; ++iter_sk)
     {
+      t1 = std::chrono::high_resolution_clock::now();
       compute_F_grad_hess(); // usa solution e atualiza grad_F, hess_F
+      t2 = std::chrono::high_resolution_clock::now();
+      timing[0] += std::chrono::duration_cast<std::chrono::microseconds>( t2 - t1 ).count();
 
+      t1 = std::chrono::high_resolution_clock::now();
       compute_dk(); // usa grad_F e hess_F e atualiza dk
+      t2 = std::chrono::high_resolution_clock::now();
+      timing[1] += std::chrono::duration_cast<std::chrono::microseconds>( t2 - t1 ).count();
 
+      t1 = std::chrono::high_resolution_clock::now();
       compute_alpha(); // usa solution e dk e atualiza alpha_k
+      t2 = std::chrono::high_resolution_clock::now();
+      timing[2] += std::chrono::duration_cast<std::chrono::microseconds>( t2 - t1 ).count();
 
+      t1 = std::chrono::high_resolution_clock::now();
       // atualiza solution
       prev_solution = solution;
       for (unsigned int i = 0; i < n_dofs; ++i)
@@ -408,6 +423,9 @@ void MySolver::solve()
 
       if(iter_sk == iter_limit_sk - 1)
         std::cout << "\n   Aviso: loop do s_k atingiu o limite de iteracoes e foi aceito como s_k final.\n";
+
+      t2 = std::chrono::high_resolution_clock::now();
+      timing[3] += std::chrono::duration_cast<std::chrono::microseconds>( t2 - t1 ).count();
     }
     output_file << "\nSolution para delta = " << delta << "\n";
     for(unsigned int i = 0; i < n_dofs; ++i)
@@ -481,5 +499,9 @@ void MySolver::run ()
     output_file.close();
 
     std::cout << "Arquivo " << "'out/sol ref" << refine_global << ".txt' gerado!" << std::endl;
+
+    std::cout << "timing:" << std::endl << timing[0]  << std::endl << timing[1] 
+              << std::endl << timing[2] << std::endl << timing[3] << std::endl;
+    
   }
 }
