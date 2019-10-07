@@ -17,6 +17,9 @@
 #include <deal.II/numerics/matrix_tools.h>
 #include <deal.II/fe/fe_q.h>
 
+#include <deal.II/lac/solver_cg.h>
+#include <deal.II/lac/precondition.h>
+
 #include <fstream>
 #include <iostream>
 #include <cmath>
@@ -26,17 +29,17 @@
 #include "solver.h"
 
 
-Solver::Solver(const int poly_degree, const unsigned int refine_global, const unsigned int quad_degree): 
+MySolver::MySolver(const int poly_degree, const unsigned int refine_global, const unsigned int quad_degree): 
   refine_global(refine_global),
   quad_degree(quad_degree),
   dof_handler(triangulation),
   fe(poly_degree)
 {}
 
-Solver::~Solver()
+MySolver::~MySolver()
 {}
 
-void Solver::compute_F_grad_hess()
+void MySolver::compute_F_grad_hess()
 {
   const bool analytic_diff = false;
 
@@ -171,7 +174,7 @@ void Solver::compute_F_grad_hess()
     
 }
 
-void Solver::compute_dk()
+void MySolver::compute_dk()
 {
   // cria o Tensor que vai conter o gradiente e a hessiana
   Vector<double> gradT(grad_F.begin(), grad_F.end()), dkT;
@@ -184,6 +187,13 @@ void Solver::compute_dk()
     for (unsigned int j = 0; j < n_dofs; ++j)
       hessT[i][j] = hess_F[i][j];
   }
+  //==========================================
+  //SolverControl solver_control(1000, 1e-12);
+  //SolverCG<> solver(solver_control); //<> vazio indica que é o padrao: Vector<double>
+  //PreconditionSSOR<> preconditioner; //<> vazio indica que é o padrao: SparseMatrix<double>
+  //preconditioner.initialize(hessT, 1.2);
+  //solver.solve(hessT, dkT, gradT, PreconditionIdentity());
+  //==========================================
 
   inv_hessT.invert(hessT);
   inv_hessT.vmult(dkT, gradT);
@@ -216,7 +226,7 @@ void Solver::compute_dk()
   }
 }
 
-void Solver::compute_alpha_derivs(double alpha, double &dF_dAlpha, double &d2F_dAlpha2)
+void MySolver::compute_alpha_derivs(double alpha, double &dF_dAlpha, double &d2F_dAlpha2)
 {
   // alphaAD é uma variavel interna de compute_alpha_derivs que recebe o valor do alpha atual
   // e é usada para fazer as derivadas
@@ -276,7 +286,7 @@ void Solver::compute_alpha_derivs(double alpha, double &dF_dAlpha, double &d2F_d
   d2F_dAlpha2 = F_delta.dx(0).dx(0);
 }
 
-void Solver::compute_alpha()
+void MySolver::compute_alpha()
 {
   double alpha = 0, prev_alpha = 0, // alpha(0) = 0
          dF_dAlpha, d2F_dAlpha2;
@@ -364,7 +374,7 @@ void Solver::compute_alpha()
   
 }
 
-void Solver::solve()
+void MySolver::solve()
 {
   for (unsigned int iter_delta = 0; iter_delta < 20; ++iter_delta)
   {
@@ -435,7 +445,7 @@ void Solver::solve()
 }
 
 
-void Solver::run ()
+void MySolver::run ()
 {
   for (unsigned int cycle=0; cycle<1; ++cycle)
   {

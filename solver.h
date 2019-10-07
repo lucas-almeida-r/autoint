@@ -10,11 +10,11 @@
 
 using namespace dealii;
 
-class Solver
+class MySolver
 {
 public:
-  Solver(const int poly_degree, const unsigned int refine_global, const unsigned int quad_degree);
-  ~Solver();
+  MySolver(const int poly_degree, const unsigned int refine_global, const unsigned int quad_degree);
+  ~MySolver();
   void run();
   
 private:
