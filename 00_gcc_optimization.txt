@@ -1,0 +1,57 @@
+COMO OTIMIZAR
+1 - rodar "make debug" ou "make release" para escolher a BUILD_TYPE
+  - ou mudar a linha "CMAKE_BUILD_TYPE:STRING" do CMakeCache
+
+2 - colocar as flags que quiser em "CMAKE_CXX_FLAGS_RELEASE:STRING" do CMakeCache
+    assim nao preciso colocar codigo no CMakeList
+    coloquei "-O2 -Wall -DNDEBUG" porque é o recomendado por um dos posts abaixo
+    (na verdade recomenda -O3, mas nao tive diferença de performance, e como existe
+     pessoas que dizem que -O3 pode ser perigoso, entao melhor deixar -O2 mesmo)
+
+3 - posso colocar flag de arquitetura "-march=native" vai deixar o codigo especifico
+    para meu pc, ai pode nao rodar em outros
+    o comando "gcc -march=native -E -v - </dev/null 2>&1 | grep cc1" parece mostrar
+	https://stackoverflow.com/questions/5470257/how-to-see-which-flags-march-native-will-activate
+    as flags com tudo especifico do meu pc. Mas nao ganhei tempo nenhum adicionando
+    o "-march=native"
+    no final parece que usar "-march=native" é o suficiente para quando estamos 
+    building no computador que vai rodar o programa
+	https://stackoverflow.com/questions/10646894/gcc-options-for-optimization-on-given-cpu-architecture
+======================================================================================
+
+Explica o basico sobre otimizacao
+a ideia é focar no -Ox, -march e -pipe 
+(diz que -pipe deixa compilacao mais rapida mas consome mais memoria, mas eu nao vi diferenca)
+	https://wiki.gentoo.org/wiki/GCC_optimization/pt-br
+
+Varias opcoes de -march=
+	https://gcc.gnu.org/onlinedocs/gcc/x86-Options.html
+
+sobre flags e -o2 -o3 (-o3 pode ser pior que -o2)
+	https://gcc.gnu.org/onlinedocs/gcc-4.9.1/gcc/Optimize-Options.html#Optimize-Options
+
+flags recomendadas makefile
+	https://stackoverflow.com/questions/25963915/recommended-gcc-release-build-flags
+
+explica sobre as flags do gcc
+	http://www.brianlheim.com/2018/04/09/cmake-cheat-sheet.html
+basta rodar no Release que a deal.ii ja usa sua versao otimizada
+	https://www.dealii.org/8.5.0/users/cmakelists.html
+	https://www.dealii.org/current/readme.html
+
+-O3 nao parece ser tao perigosa, mas rodei com -O2 e deu igual
+	https://stackoverflow.com/questions/11546075/is-optimisation-level-o3-dangerous-in-g
+
+como eu poderia passar as flags editando o CMakeList
+	https://stackoverflow.com/questions/11783932/how-do-i-add-a-linker-or-compile-flag-in-a-cmake-file
+
+
+Posso tentar colocar a arquitetura do meu pc
+sobre arquiteturas
+	https://stackoverflow.com/questions/10646894/gcc-options-for-optimization-on-given-cpu-architecture
+	
+	https://www.quora.com/Is-a-compiler-target-specific-I-mean-if-you-have-compiler-for-processor-x-can-it-compile-for-processor-y-and-why
+
+sobre otimizacao
+	https://stackoverflow.com/questions/1778538/how-many-gcc-optimization-levels-are-there
+
