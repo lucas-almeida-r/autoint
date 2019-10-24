@@ -23,6 +23,7 @@ private:
   void compute_dk();
   void compute_alpha();
   void compute_alpha_derivs(double alpha, double &dF_dAlpha, double &d2F_dAlpha2);
+  void create_480_cells();
 
   const unsigned int refine_global, quad_degree;
 

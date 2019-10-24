@@ -38,7 +38,7 @@ int main()
       }
       
 
-      MySolver solver(1,9,3);
+      MySolver solver(1,0,3); // 0 para rodar com "480" elementos
       solver.run();      
 
     } //end try

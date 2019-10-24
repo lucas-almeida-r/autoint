@@ -110,6 +110,10 @@ void MySolver::compute_F_grad_hess()
       E_h = 0; P_h = 0; F_delta = 0; // zera qualquer historico de contas
       E_h = (pow(rho*sg_prime, 2) + 2*gama*pow(sg,2)) * fe_values.JxW(q); //+=
       P_h = pow(rho, 2) / ( (1+sg_prime) * pow(1+sg/rho, 2) - eps ) * fe_values.JxW(q); //+=
+      //P_h = pow(rho, 2) *  // alternativa com soma do det alem da soma do inverso do det
+      //      (1 / ((1+sg_prime) * pow(1+sg/rho, 2) - eps) +
+      //       ((1+sg_prime) * pow(1+sg/rho, 2) - eps) ) * fe_values.JxW(q);
+
       F_delta = c11/2 * E_h + P_h / delta;
 
       // adiciona contribuicao de uma das parcelas da somatoria
@@ -462,6 +466,56 @@ void MySolver::solve()
   
 }
 
+void MySolver::create_480_cells()
+{
+  int c1=0, c2=0, c3=0;
+  
+  for (unsigned int i = 0; i < 100000; ++i)
+  {
+    
+    for (const auto &cell : dof_handler.active_cell_iterators())
+    {
+      double rho = cell->vertex(1)(0);
+      double h = std::abs(cell->vertex(1)(0) - cell->vertex(0)(0)); // coord final e inicial
+
+      if (rho > 0.46*radius && h > 0.54/70 && c3 < 70) //0.54/80
+      {
+        //done = false;
+        //c3 += 1;
+        //std::cout << h << "\n";
+        cell->set_refine_flag();
+      } else if (rho > 0.07*radius && rho <= 0.46*radius && h > 0.39/100 && c2 < 99) //0.39/100
+      {
+        //done = false;
+        //c2 += 1;
+
+        cell->set_refine_flag();
+      } else if (rho > 0. && rho <= 0.07*radius && h > 0.07/280 && c1 < 280) //0.07/300
+      {
+        //done = false;
+        //c1 += 1;
+        cell->set_refine_flag();
+      }
+    } // end for cells
+
+    triangulation.execute_coarsening_and_refinement();
+
+    c1=0; c2=0; c3=0;
+    for (const auto &cell : triangulation.active_cell_iterators())
+    {
+      double rho = cell->vertex(1)(0);
+      if (rho > 0.46*radius) c3 += 1;
+      else if (rho > 0.07*radius) c2 += 1;
+      else if (rho > 0.) c1 += 1;
+    }
+
+    std::cout << c1 << "  " << c2 << "  " << c3 << "  " << c1+c2+c3 << std::endl;
+
+    if(c1>=272 && c2>=99 && c3>=70) break;
+    if(i==99999) std::cout << "Erro! Precisava refinar mais";
+  }
+} // end create_480_cells()
+
 
 void MySolver::run ()
 {
@@ -471,7 +525,9 @@ void MySolver::run ()
     if (cycle == 0)
       {
         GridGenerator::hyper_cube(triangulation, 0, radius, /*colorize*/ true);
-        triangulation.refine_global(refine_global);
+        
+        if(refine_global == 0) create_480_cells();
+        else triangulation.refine_global(refine_global);
       }
     else
       Assert(false, ExcNotImplemented()); //refine_grid ();
