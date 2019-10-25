@@ -24,6 +24,7 @@ private:
   void compute_alpha();
   void compute_alpha_derivs(double alpha, double &dF_dAlpha, double &d2F_dAlpha2);
   void create_480_cells();
+  void write_output_file();
 
   const unsigned int refine_global, quad_degree;
 
@@ -51,4 +52,6 @@ private:
 
   // comp_grad, comp_dk, comp_alpha, update+parada
   std::vector<double> timing{0.,0.,0.,0.};
+  // output data
+  std::vector<std::vector<double>> output_data;
 };
