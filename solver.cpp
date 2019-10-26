@@ -474,47 +474,40 @@ void MySolver::solve()
 
 void MySolver::create_480_cells()
 {
-  int c1=0, c2=0, c3=0;
-  
-  for (unsigned int i = 0; i < 100000; ++i)
+  std::vector<std::vector<double>> cell_sizes(1);
+  std::vector<double> tmp(480, 0.);
+  Point<1> origin(0), end(1);
+  cell_sizes[0] = tmp;
+
+  for(unsigned int i=0; i<480; ++i)
   {
-    for (const auto &cell : dof_handler.active_cell_iterators())
-    {
-      double rho = cell->vertex(1)(0);
-      double h = std::abs(cell->vertex(1)(0) - cell->vertex(0)(0)); // coord final e inicial
-
-      if (rho > 0.46*radius && h > 0.54/70 && c3 < 70) //0.54/80
-      {
-        cell->set_refine_flag();
-      } else if (rho > 0.07*radius && rho <= 0.46*radius && h > 0.39/100 && c2 < 99) //0.39/100
-      {
-        cell->set_refine_flag();
-      } else if (rho > 0. && rho <= 0.07*radius && h > 0.07/280 && c1 < 280) //0.07/300
-      {
-        cell->set_refine_flag();
-      }
-    } // end for cells
-
-    triangulation.execute_coarsening_and_refinement();
-
-    c1=0; c2=0; c3=0;
-    for (const auto &cell : dof_handler.active_cell_iterators())
-    {
-      double rho = cell->vertex(1)(0);
-      if (rho > 0.46*radius) c3 += 1;
-      else if (rho > 0.07*radius) c2 += 1;
-      else if (rho > 0.) c1 += 1;
-    }
-
-    // esses numeros sao settados manualmente para que +-480 cells
-    if(c1>=272 && c2>=99 && c3>=70) break; 
-    if(i==99999) std::cout << "Erro! Precisava refinar mais";
+    if (i<300) cell_sizes[0][i] = 0.07/300;
+    else if (i>=300 && i<400) cell_sizes[0][i] = 0.39/100;
+    else cell_sizes[0][i] = 0.54/80;
   }
+  GridGenerator::subdivided_hyper_rectangle(triangulation, cell_sizes, origin, end, true);
+
+  /* std::cout << "RHOS\n";
+    for (const auto &cell : triangulation.active_cell_iterators())
+    {
+      double rho = cell->vertex(1)(0);
+      std::cout << rho << "\n";
+    } */
 } // end create_480_cells()
 
 void MySolver::write_output_file()
 {
   output_file.open("out/sol ref" + std::to_string(refine_global) + ".txt");
+  
+  // add os rho de cada dof na primeira linha de output_data
+  /* std::vector<double> rhos(n_dofs);
+  int i_rhos = 0;
+  for (const auto &cell : dof_handler.active_cell_iterators())
+    {
+      rhos[i_rhos] = cell->vertex(1)(0);
+      i_rhos += 1;
+    }
+    output_data.insert(output_data.begin(), rhos); */
 
   for (unsigned int i = 0; i < size(output_data); ++i)
   {
@@ -540,9 +533,11 @@ void MySolver::run ()
     std::cout << "Cycle " << cycle << ':' << std::endl;
     if (cycle == 0)
       {
-        GridGenerator::hyper_cube(triangulation, 0, radius, /*colorize*/ true);
         if(refine_global == 0) create_480_cells();
-        else triangulation.refine_global(refine_global);
+        else {
+          GridGenerator::hyper_cube(triangulation, 0, radius, /*colorize*/ true);
+          triangulation.refine_global(refine_global);
+        }
       }
     else
       Assert(false, ExcNotImplemented()); //refine_grid ();
@@ -565,6 +560,7 @@ void MySolver::run ()
               << dof_handler.n_dofs()
               << std::endl;
     
+    // [UPDATE] nao precisa mais desse Renumbering porque refiz o create_480_cells
     // Esse Renumbering faz os dofs menores (0,1,3,4,...) estarem proximos de rho=0
     // e os dofs maiores estarem proximos de rho=radius
     // isso é necessario para a malha nao uniforme, para a uniforme nao muda nada
@@ -575,9 +571,9 @@ void MySolver::run ()
     // mais info em:
     //  https://www.dealii.org/current/doxygen/deal.II/namespaceDoFRenumbering.html#a6ad7b76064dd49a98187ff2b06298cf9
     //  https://www.dealii.org/current/doxygen/deal.II/DEALGlossary.html#GlossZOrder
-    DoFRenumbering::hierarchical(dof_handler);
+    //DoFRenumbering::hierarchical(dof_handler);
 
-    /* // esse loop comentado é so para verificar que os dofs estao ordenados
+    // esse loop comentado é so para verificar que os dofs estao ordenados
     std::vector<types::global_dof_index> local_dof_indices (2);
     std::cout << "Coordenadas e graus de liberdade de cada celula" << "\n";
     for (const auto &cell : dof_handler.active_cell_iterators())
@@ -587,7 +583,7 @@ void MySolver::run ()
       double rho0 = cell->vertex(0)(0);
       std::cout << rho1 << " " << rho0 << " " << rho1-rho0 << " "
                 << local_dof_indices[0] << " " << local_dof_indices[1] << std::endl;
-    } */
+    }
 
     //output_file.open("out/sol ref" + std::to_string(refine_global) + ".txt");
     solve();
