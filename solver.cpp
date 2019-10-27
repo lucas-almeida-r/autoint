@@ -20,6 +20,8 @@
 
 //#include <deal.II/lac/solver_cg.h>
 //#include <deal.II/lac/precondition.h>
+#include <iomanip> // @@@
+#include <limits> //@@@
 
 #include <fstream>
 #include <iostream>
@@ -327,9 +329,11 @@ void MySolver::compute_alpha()
       double h = cell->vertex(1)(0) - cell->vertex(0)(0);
       double phi_i_prime = 1 / h;
       double sg_prime = new_s[local_dof_indices[0]]*(-phi_i_prime) + new_s[local_dof_indices[1]]*phi_i_prime;
-      //double sg = new_s[local_dof_indices[1]]*1; //sg de rho
+      //double sg = new_s[local_dof_indices[1]]; //sg de rho
       double sg = new_s[local_dof_indices[0]]*0.5 + new_s[local_dof_indices[1]]*0.5; //sg de rho_m
+      //double det = (1 + sg_prime) * pow(1 + sg/rho, 2) - eps;
       double det = (1 + sg_prime) * pow(1 + sg/rho_m, 2) - eps;
+
 
       if(det < 0)
       {
@@ -503,13 +507,14 @@ void MySolver::write_output_file()
   output_file.open("out/sol ref" + std::to_string(refine_global) + ".txt");
   
   // add os rho de cada dof na primeira linha de output_data
-  std::vector<double> rhos(n_dofs);
-  int i_rhos = 0;
+  std::vector<double> rhos(n_dofs, 0.);
+  int i_rhos = 1; // primeiro rho é zero
   for (const auto &cell : dof_handler.active_cell_iterators())
     {
       rhos[i_rhos] = cell->vertex(1)(0);
       i_rhos += 1;
     }
+    rhos.insert(rhos.begin(), 0); // para alinhar com os deslocs
     output_data.insert(output_data.begin(), rhos);
 
   for (unsigned int i = 0; i < size(output_data); ++i)
@@ -536,16 +541,25 @@ void MySolver::compute_lagrange_det()
   for(const auto &cell : dof_handler.active_cell_iterators())
   {
     cell->get_dof_indices(local_dof_indices);
+    //double rho = cell->vertex(1)(0); // rho no meio da celula
     double rho_m = (cell->vertex(1)(0) + cell->vertex(0)(0))*0.5; // rho no meio da celula
     double h = cell->vertex(1)(0) - cell->vertex(0)(0);
     double phi_i_prime = 1 / h;
     double sg_prime = solution[local_dof_indices[0]]*(-phi_i_prime) + solution[local_dof_indices[1]]*phi_i_prime;
+    //double sg = solution[local_dof_indices[1]]; //sg de rho
     double sg = solution[local_dof_indices[0]]*0.5 + solution[local_dof_indices[1]]*0.5; //sg de rho_m
+    //double det = (1 + sg_prime) * pow(1 + sg/rho, 2);
     double det = (1 + sg_prime) * pow(1 + sg/rho_m, 2);
     dets.emplace_back(det);
-  }
-  output_data.emplace_back(dets);
 
+    //std::cout << std::setprecision (std::numeric_limits<double>::max_digits10)
+    //          << det
+    //          << std::endl;
+  }
+  //std::cout << std::setprecision (std::numeric_limits<double>::max_digits10)
+  //            << eps
+  //            << std::endl;
+  
   std::vector<double> lagranges;
   for(unsigned int i=0; i<size(dets); ++i)
   {
@@ -553,6 +567,13 @@ void MySolver::compute_lagrange_det()
     double lagrange = 1. / (1e+8 * pow(dets[i]-eps, 2));
     lagranges.emplace_back(lagrange);
   }
+
+  dets.insert(dets.begin(), 0); // para alinhar com os rhos
+  dets.insert(dets.begin(), 0);
+  output_data.emplace_back(dets);
+
+  lagranges.insert(lagranges.begin(), 0); // para alinhar com os rhos
+  lagranges.insert(lagranges.begin(), 0);
   output_data.emplace_back(lagranges);
 
 }

@@ -38,7 +38,13 @@ private:
   const unsigned int iter_limit_alpha = 100; // numero maximo de iteracoes para alpha
   const unsigned int iter_limit_sk = 100; // numero maximo de iteracoes para s_k
   const double alpha_tol = 0.0001; // criterio de parada da busca pelo alpha
-  const double solution_tol = 0.0001; // criterio de parada da busca pelo s_k
+  
+  // com solution_tol = 1e-4 o calculo do determinante apresentava valores diferente
+  // dos seus vizinhos e ai o lagrange formava picos, com 1e-7 isso ja nao aconteceu mais.
+  // De 1e-7 para 1e-10 nao houve uma grande diferenca
+  // os resultados do lagrangeano (o calculo mais sensivel a erros) ficaram bem proximos
+  const double solution_tol = 1e-10; // criterio de parada da busca pelo s_k
+
   std::ofstream output_file;
 
   Triangulation<1> triangulation;
