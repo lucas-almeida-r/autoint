@@ -25,6 +25,7 @@ private:
   void compute_alpha_derivs(double alpha, double &dF_dAlpha, double &d2F_dAlpha2);
   void create_480_cells();
   void write_output_file();
+  void compute_lagrange_det();
 
   const unsigned int refine_global, quad_degree;
 

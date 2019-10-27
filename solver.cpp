@@ -88,7 +88,7 @@ void MySolver::compute_F_grad_hess()
     {
       dofs[i] = solution[local_dof_indices[i]];
       dofs[i].diff(i, dofs_per_cell);
-      dofs[i].val().diff(i, n_dofs);
+      dofs[i].val().diff(i, dofs_per_cell); //antes estava n_dofs
     }
 
     for (unsigned int q = 0; q < n_q_points; ++q)
@@ -189,7 +189,7 @@ void MySolver::compute_dk()
 
   for (unsigned int i = 0; i < n_dofs; ++i)
   {
-    gradT(i) = grad_F[i];
+    //gradT(i) = grad_F[i];
     for (unsigned int j = 0; j < n_dofs; ++j)
       hessT[i][j] = hess_F[i][j];
   }
@@ -322,11 +322,14 @@ void MySolver::compute_alpha()
     for (; cell!=endc; ) // rodo ++cell manualmente
     {
       cell->get_dof_indices(local_dof_indices);
-      double rho = cell->vertex(1)(0); // espero que o segundo vertice seja sempre o do rho maior [CONFERIR]
+      //double rho = cell->vertex(1)(0);
+      double rho_m = (cell->vertex(1)(0) + cell->vertex(0)(0))*0.5; // rho no meio da celula
       double h = cell->vertex(1)(0) - cell->vertex(0)(0);
       double phi_i_prime = 1 / h;
       double sg_prime = new_s[local_dof_indices[0]]*(-phi_i_prime) + new_s[local_dof_indices[1]]*phi_i_prime;
-      double det = (1 + sg_prime) * pow(1 + new_s[local_dof_indices[1]]*1/rho, 2) - eps;
+      //double sg = new_s[local_dof_indices[1]]*1; //sg de rho
+      double sg = new_s[local_dof_indices[0]]*0.5 + new_s[local_dof_indices[1]]*0.5; //sg de rho_m
+      double det = (1 + sg_prime) * pow(1 + sg/rho_m, 2) - eps;
 
       if(det < 0)
       {
@@ -500,14 +503,14 @@ void MySolver::write_output_file()
   output_file.open("out/sol ref" + std::to_string(refine_global) + ".txt");
   
   // add os rho de cada dof na primeira linha de output_data
-  /* std::vector<double> rhos(n_dofs);
+  std::vector<double> rhos(n_dofs);
   int i_rhos = 0;
   for (const auto &cell : dof_handler.active_cell_iterators())
     {
       rhos[i_rhos] = cell->vertex(1)(0);
       i_rhos += 1;
     }
-    output_data.insert(output_data.begin(), rhos); */
+    output_data.insert(output_data.begin(), rhos);
 
   for (unsigned int i = 0; i < size(output_data); ++i)
   {
@@ -525,6 +528,34 @@ void MySolver::write_output_file()
   
 } // end write_output_file()
 
+void MySolver::compute_lagrange_det()
+{
+  // calculo determinante ao longo do raio
+  std::vector<double> dets;
+  std::vector<types::global_dof_index> local_dof_indices (2);
+  for(const auto &cell : dof_handler.active_cell_iterators())
+  {
+    cell->get_dof_indices(local_dof_indices);
+    double rho_m = (cell->vertex(1)(0) + cell->vertex(0)(0))*0.5; // rho no meio da celula
+    double h = cell->vertex(1)(0) - cell->vertex(0)(0);
+    double phi_i_prime = 1 / h;
+    double sg_prime = solution[local_dof_indices[0]]*(-phi_i_prime) + solution[local_dof_indices[1]]*phi_i_prime;
+    double sg = solution[local_dof_indices[0]]*0.5 + solution[local_dof_indices[1]]*0.5; //sg de rho_m
+    double det = (1 + sg_prime) * pow(1 + sg/rho_m, 2);
+    dets.emplace_back(det);
+  }
+  output_data.emplace_back(dets);
+
+  std::vector<double> lagranges;
+  for(unsigned int i=0; i<size(dets); ++i)
+  {
+    // para delta = 1e+8
+    double lagrange = 1. / (1e+8 * pow(dets[i]-eps, 2));
+    lagranges.emplace_back(lagrange);
+  }
+  output_data.emplace_back(lagranges);
+
+}
 
 void MySolver::run ()
 {
@@ -574,7 +605,7 @@ void MySolver::run ()
     //DoFRenumbering::hierarchical(dof_handler);
 
     // esse loop comentado é so para verificar que os dofs estao ordenados
-    std::vector<types::global_dof_index> local_dof_indices (2);
+    /* std::vector<types::global_dof_index> local_dof_indices (2);
     std::cout << "Coordenadas e graus de liberdade de cada celula" << "\n";
     for (const auto &cell : dof_handler.active_cell_iterators())
     {
@@ -583,11 +614,12 @@ void MySolver::run ()
       double rho0 = cell->vertex(0)(0);
       std::cout << rho1 << " " << rho0 << " " << rho1-rho0 << " "
                 << local_dof_indices[0] << " " << local_dof_indices[1] << std::endl;
-    }
+    } */
 
     //output_file.open("out/sol ref" + std::to_string(refine_global) + ".txt");
     solve();
     //output_file.close();
+    compute_lagrange_det();
     write_output_file();
 
     std::cout << "timing:" << std::endl << timing[0]  << std::endl << timing[1] 
