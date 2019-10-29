@@ -31,7 +31,7 @@ private:
 
   const double pressure = 1000, c11 = 1e+5, c22 = 5e+4, c23 = 5.5e+3,
                eps = 0.1, radius = 1, c12 = 5e+4, gama = (c22 + c23 - c12)/c11;
-  double delta = 0.001, delta_max = 1e+8;
+  double delta = 1e-2, delta_max = 1e+8;
   unsigned int n_dofs;
   double alpha_k;
   bool verbose = false;

@@ -18,6 +18,8 @@
 #include <deal.II/numerics/matrix_tools.h>
 #include <deal.II/fe/fe_q.h>
 
+#include <deal.II/lac/lapack_full_matrix.h>
+
 //#include <deal.II/lac/solver_cg.h>
 //#include <deal.II/lac/precondition.h>
 #include <iomanip> // @@@
@@ -29,6 +31,7 @@
 #include <chrono>
 
 #include <Sacado.hpp>
+
 
 #include "solver.h"
 
@@ -185,15 +188,22 @@ void MySolver::compute_F_grad_hess()
 void MySolver::compute_dk()
 {
   // cria o Tensor que vai conter o gradiente e a hessiana
-  Vector<double> gradT(grad_F.begin(), grad_F.end()), dkT;
-  dkT.reinit(n_dofs);
-  FullMatrix<double> hessT(n_dofs, n_dofs), inv_hessT(n_dofs, n_dofs);
+  //Vector<double> gradT(grad_F.begin(), grad_F.end()), dkT(grad_F.begin(), grad_F.end());
+  //dkT.reinit(n_dofs);
+  //FullMatrix<double> hessT(n_dofs, n_dofs), inv_hessT(n_dofs, n_dofs);
 
+  // Resolvendo o sistema com solver lapack
+  // Na verdade o ideal seria trabalhar com a hessiana como uma SparseMatrix e usar
+  // algum solver de matriz esparsa da dealii
+  Vector<double> dkT(grad_F.begin(), grad_F.end());
+  LAPACKFullMatrix<double> lapack_hess(n_dofs);
+  
   for (unsigned int i = 0; i < n_dofs; ++i)
   {
     //gradT(i) = grad_F[i];
     for (unsigned int j = 0; j < n_dofs; ++j)
-      hessT[i][j] = hess_F[i][j];
+      //hessT[i][j] = hess_F[i][j];
+      lapack_hess(i,j) = hess_F[i][j];
   }
   //==========================================
   //SolverControl solver_control(1000, 1e-12);
@@ -202,36 +212,19 @@ void MySolver::compute_dk()
   //preconditioner.initialize(hessT, 1.2);
   //solver.solve(hessT, dkT, gradT, PreconditionIdentity());
   //==========================================
+  
+  // .solve espera que ja tenhamos feito a LU factorization
+  // inicialmente dkT é o vetor do lado direito, mas apos o .solve ele vira a solucao do sistema
+  lapack_hess.compute_lu_factorization();
+  lapack_hess.solve(dkT);
 
-  inv_hessT.invert(hessT);
-  inv_hessT.vmult(dkT, gradT);
+  //inv_hessT.invert(hessT);
+  //inv_hessT.vmult(dkT, gradT);
   
   // dk[0] nunca sera atualizado, entao dk[0] sera sempre zero, entao new_s[0] e solution[0] serao sempre zero
   for (unsigned int i = 1; i < n_dofs; ++i)
     dk[i] = -dkT(i); // d_k = - inv(hess)*grad
 
-  // somente alguns prints
-  if(verbose)
-  {
-    // print da inversa
-    std::cout << "\ninv_hessT:\n";
-    for(unsigned int i = 0; i < n_dofs; ++i)
-    {
-      for(unsigned int j = 0; j < n_dofs; ++j)
-        std::cout << inv_hessT[i][j] << "\t";
-      std::cout << std::endl;
-    }
-
-    // print do gradiente
-    std::cout << "\ngradT:\n";
-    for(unsigned int i = 0; i < n_dofs; ++i)
-      std::cout << gradT[i] << std::endl;
-
-    // print do dk
-    std::cout << "\ndk:\n";
-    for(unsigned int i = 0; i < n_dofs; ++i)
-      std::cout << dk[i] << std::endl;
-  }
 }
 
 void MySolver::compute_alpha_derivs(double alpha, double &dF_dAlpha, double &d2F_dAlpha2)
@@ -393,7 +386,7 @@ void MySolver::solve()
   auto t1 = std::chrono::high_resolution_clock::now();
   auto t2 = std::chrono::high_resolution_clock::now();
 
-  for (unsigned int iter_delta = 0; iter_delta < 20; ++iter_delta)
+  for (unsigned int iter_delta = 0; iter_delta < 50; ++iter_delta)
   {
     for (unsigned int iter_sk = 0; iter_sk < iter_limit_sk; ++iter_sk)
     {
