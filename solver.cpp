@@ -495,9 +495,10 @@ void MySolver::create_480_cells()
     } */
 } // end create_480_cells()
 
-void MySolver::write_output_file()
+void MySolver::write_output_file(const unsigned int cycle)
 {
-  output_file.open("out/sol ref" + std::to_string(refine_global) + ".txt");
+  output_file.open("out/sol ref" + std::to_string(refine_global) +
+                   "-" + std::to_string(cycle) + ".txt");
   
   // add os rho de cada dof na primeira linha de output_data
   std::vector<double> rhos(n_dofs, 0.);
@@ -573,37 +574,44 @@ void MySolver::compute_lagrange_det()
 
 void MySolver::run ()
 {
-  for (unsigned int cycle=0; cycle<1; ++cycle)
+  for (unsigned int cycle=0; cycle<n_cycles; ++cycle)
   {
     std::cout << "Cycle " << cycle << ':' << std::endl;
+    pressure = final_pressure*(cycle+1)/n_cycles;
+    delta = delta_min;
+    output_data.clear();
     if (cycle == 0)
-      {
-        if(refine_global == 0) create_480_cells();
-        else {
-          GridGenerator::hyper_cube(triangulation, 0, radius, /*colorize*/ true);
-          triangulation.refine_global(refine_global);
-        }
+    {
+      if(refine_global == 0) create_480_cells();
+      else {
+        GridGenerator::hyper_cube(triangulation, 0, radius, /*colorize*/ true);
+        triangulation.refine_global(refine_global);
       }
-    else
-      Assert(false, ExcNotImplemented()); //refine_grid ();
 
-    std::cout << "   Number of active cells:       "
+      std::cout << "   Number of active cells:       "
               << triangulation.n_active_cells()
               << std::endl;
 
-    dof_handler.distribute_dofs(fe); // garantir numeracao do rho=0 ate o rho=radius
-    n_dofs = dof_handler.n_dofs();
-    solution.resize(n_dofs, 0); // lembrar que primeiro dof é sempre 0, faço isso deixando sempre dk[0]=0
-    //solution = {-0.0001,-0.002,-0.005};
-    prev_solution.resize(n_dofs, 0);
-    grad_F.resize(n_dofs, 0);
-    dk.resize(n_dofs, 0);
-    hess_F.resize(n_dofs, grad_F);
-    alpha_k = 0;
-      
-    std::cout << "   Number of degrees of freedom: "
+      dof_handler.distribute_dofs(fe); // garantir numeracao do rho=0 ate o rho=radius
+      n_dofs = dof_handler.n_dofs();
+      solution.resize(n_dofs, 0); // lembrar que primeiro dof é sempre 0, faço isso deixando sempre dk[0]=0
+      //solution = {-0.0001,-0.002,-0.005};
+      prev_solution.resize(n_dofs, 0);
+      grad_F.resize(n_dofs, 0);
+      dk.resize(n_dofs, 0);
+      hess_F.resize(n_dofs, grad_F);
+
+      std::cout << "   Number of degrees of freedom: "
               << dof_handler.n_dofs()
               << std::endl;
+    }
+    //else
+    //  Assert(false, ExcNotImplemented()); //refine_grid ();
+
+    
+    alpha_k = 0;
+      
+    
     
     // [UPDATE] nao precisa mais desse Renumbering porque refiz o create_480_cells
     // Esse Renumbering faz os dofs menores (0,1,3,4,...) estarem proximos de rho=0
@@ -634,7 +642,7 @@ void MySolver::run ()
     solve();
     //output_file.close();
     compute_lagrange_det();
-    write_output_file();
+    write_output_file(cycle);
 
     std::cout << "timing:" << std::endl << timing[0]  << std::endl << timing[1] 
               << std::endl << timing[2] << std::endl << timing[3] << std::endl;

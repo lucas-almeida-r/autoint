@@ -24,20 +24,22 @@ private:
   void compute_alpha();
   void compute_alpha_derivs(double alpha, double &dF_dAlpha, double &d2F_dAlpha2);
   void create_480_cells();
-  void write_output_file();
+  void write_output_file(const unsigned int cycle);
   void compute_lagrange_det();
 
   const unsigned int refine_global, quad_degree;
 
-  const double pressure = 1000, c11 = 1e+5, c22 = 5e+4, c23 = 5.5e+3,
+  const double final_pressure = 1000, c11 = 1e+5, c22 = 5e+4, c23 = 5.5e+3,
                eps = 0.1, radius = 1, c12 = 5e+4, gama = (c22 + c23 - c12)/c11;
-  double delta = 1e-2, delta_max = 1e+8;
+  double delta_max = 1e+8, delta_min = 1e-0, delta;
+  double pressure;
   unsigned int n_dofs;
   double alpha_k;
   bool verbose = false;
   const unsigned int iter_limit_alpha = 100; // numero maximo de iteracoes para alpha
   const unsigned int iter_limit_sk = 100; // numero maximo de iteracoes para s_k
   const double alpha_tol = 0.0001; // criterio de parada da busca pelo alpha
+  const unsigned int n_cycles = 5;
   
   // com solution_tol = 1e-4 o calculo do determinante apresentava valores diferente
   // dos seus vizinhos e ai o lagrange formava picos, com 1e-7 isso ja nao aconteceu mais.
